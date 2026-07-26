@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuditProcessController;
 use App\Http\Controllers\AuditQuestionController;
 use App\Http\Controllers\Auth\LoginController;
@@ -14,23 +13,12 @@ Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-// Minha conta (ponto 1) e troca obrigatória de senha (ponto 2)
-Route::middleware('auth')->group(function () {
-    Route::get('/minha-conta', [AccountController::class, 'editar'])->name('conta.editar');
-    Route::put('/minha-conta/senha', [AccountController::class, 'atualizarSenha'])->name('conta.senha');
-
-    Route::get('/trocar-senha', [AccountController::class, 'editarForcado'])->name('senha.forcar.editar');
-    Route::put('/trocar-senha', [AccountController::class, 'atualizarSenhaForcado'])->name('senha.forcar.atualizar');
-});
-
 // Processos de auditoria
 Route::middleware('auth')->group(function () {
     Route::get('/processos', [AuditProcessController::class, 'index'])->name('processes.index');
     Route::get('/processos/novo', [AuditProcessController::class, 'create'])->name('processes.create');
     Route::post('/processos', [AuditProcessController::class, 'store'])->name('processes.store');
     Route::get('/processos/{process}', [AuditProcessController::class, 'show'])->name('processes.show');
-    Route::get('/processos/{process}/editar', [AuditProcessController::class, 'edit'])->name('processes.edit');
-    Route::put('/processos/{process}', [AuditProcessController::class, 'update'])->name('processes.update');
     Route::post('/processos/{process}/transicionar', [AuditProcessController::class, 'transicionar'])
         ->name('processes.transicionar');
 });

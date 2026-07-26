@@ -10,7 +10,22 @@
         @endcan
     </div>
 
+    @if ($podeVerTodos)
+        <p style="font-size:13px;">
+            @if ($mostrandoTodos)
+                Mostrando <strong>todos os processos</strong>.
+                <a href="{{ request()->fullUrlWithQuery(['meus' => 1]) }}">Ver só os meus</a>
+            @else
+                Mostrando <strong>somente os meus processos</strong>.
+                <a href="{{ request()->fullUrlWithQuery(['meus' => 0]) }}">Ver todos</a>
+            @endif
+        </p>
+    @endif
+
     <form method="GET" style="display:flex; gap:8px; margin-bottom:16px;">
+        @if ($mostrandoTodos)
+            <input type="hidden" name="meus" value="0">
+        @endif
         <input type="text" name="busca" placeholder="Buscar por nome ou ID" value="{{ request('busca') }}" style="flex:1;">
         <select name="status">
             <option value="">Todos os status</option>

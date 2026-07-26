@@ -28,6 +28,22 @@
             </label>
         @endforeach
 
+        <hr style="margin:20px 0;">
+        <p style="font-size:13px; color:#666;">
+            Preencha abaixo somente se quiser definir uma nova senha para este usuário.
+            @if ($usuario->deve_alterar_senha)
+                <br><strong>Este usuário já está com troca de senha pendente no próximo login.</strong>
+            @endif
+        </p>
+
+        <label>Nova senha (opcional)</label>
+        <input type="password" name="nova_senha" minlength="8" placeholder="Deixe em branco para não alterar">
+
+        <label style="font-weight:normal;">
+            <input type="checkbox" name="forcar_troca_senha" value="1" style="width:auto;">
+            Forçar troca de senha no próximo login
+        </label>
+
         <button type="submit">Salvar alterações</button>
     </form>
 @endsection

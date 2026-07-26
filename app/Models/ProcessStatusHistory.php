@@ -19,6 +19,10 @@ class ProcessStatusHistory extends Model
         'criado_em',
     ];
 
+    protected $casts = [
+        'criado_em' => 'datetime',
+    ];
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');

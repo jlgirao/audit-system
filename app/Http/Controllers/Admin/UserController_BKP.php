@@ -6,17 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Routing\Controllers\HasMiddleware;
 use Spatie\Permission\Models\Role;
 
-class UserController extends Controller implements HasMiddleware
+class UserController extends Controller
 {
-    public static function middleware(): array
+    public function __construct()
     {
-        return [
-            'auth',
-            'permission:gerenciar-usuarios',
-        ];
+        $this->middleware(['auth', 'permission:gerenciar-usuarios']);
     }
 
     public function index()
@@ -48,10 +44,9 @@ class UserController extends Controller implements HasMiddleware
             'email' => $dados['email'],
             'senha_hash' => Hash::make($dados['senha']),
             'ativo' => true,
-            // Usuário novo sempre troca a senha inicial no primeiro acesso.
-            'deve_alterar_senha' => true,
         ]);
 
+        // Um usuário pode acumular múltiplos perfis (ex: analista + auditor).
         $usuario->syncRoles($dados['perfis']);
 
         return redirect()->route('admin.users.index')->with('status', 'Usuário criado com sucesso.');
@@ -72,29 +67,14 @@ class UserController extends Controller implements HasMiddleware
             'ativo' => ['nullable', 'boolean'],
             'perfis' => ['required', 'array', 'min:1'],
             'perfis.*' => ['exists:roles,name'],
-            // Ponto 2: campos opcionais — admin pode deixar em branco se só
-            // quiser marcar "forçar troca no próximo login" sem definir a senha.
-            'nova_senha' => ['nullable', 'string', 'min:8'],
-            'forcar_troca_senha' => ['nullable', 'boolean'],
         ]);
 
-        $atualizacao = [
+        $user->update([
             'nome' => $dados['nome'],
             'email' => $dados['email'],
             'ativo' => $request->boolean('ativo'),
-        ];
+        ]);
 
-        if (! empty($dados['nova_senha'])) {
-            $atualizacao['senha_hash'] = Hash::make($dados['nova_senha']);
-        }
-
-        // Se o admin definiu uma nova senha OU marcou a caixa explicitamente,
-        // o usuário é obrigado a trocar no próximo login.
-        if (! empty($dados['nova_senha']) || $request->boolean('forcar_troca_senha')) {
-            $atualizacao['deve_alterar_senha'] = true;
-        }
-
-        $user->update($atualizacao);
         $user->syncRoles($dados['perfis']);
 
         return redirect()->route('admin.users.index')->with('status', 'Usuário atualizado com sucesso.');

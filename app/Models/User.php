@@ -16,6 +16,7 @@ class User extends Authenticatable
         'email',
         'senha_hash',
         'ativo',
+        'deve_alterar_senha',
     ];
 
     protected $hidden = [
@@ -34,6 +35,7 @@ class User extends Authenticatable
     {
         return [
             'ativo' => 'boolean',
+            'deve_alterar_senha' => 'boolean',
         ];
     }
 
@@ -46,5 +48,14 @@ class User extends Authenticatable
     public function processosCriados()
     {
         return $this->hasMany(AuditProcess::class, 'criado_por');
+    }
+
+    /**
+     * Ponto 3: admin sempre vê/gerencia tudo. Centralizamos aqui a
+     * checagem em vez de espalhar hasRole('admin') pelos controllers.
+     */
+    public function ehAdmin(): bool
+    {
+        return $this->hasRole('admin');
     }
 }

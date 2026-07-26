@@ -4,17 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditQuestion;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controllers\HasMiddleware;
-use Illuminate\Routing\Controllers\Middleware;
 
-class AuditQuestionController extends Controller implements HasMiddleware
+class AuditQuestionController extends Controller
 {
-    public static function middleware(): array
+    public function __construct()
     {
-        return [
-            'auth',
-            'permission:gerenciar-perguntas',
-        ];
+        $this->middleware(['auth', 'permission:gerenciar-perguntas']);
     }
 
     public function index()
@@ -32,50 +27,35 @@ class AuditQuestionController extends Controller implements HasMiddleware
     public function store(Request $request)
     {
         $dados = $this->validarDados($request);
-
         AuditQuestion::create($dados);
 
-        return redirect()
-            ->route('questions.index')
-            ->with('status', 'Pergunta criada com sucesso.');
+        return redirect()->route('questions.index')->with('status', 'Pergunta criada com sucesso.');
     }
 
     public function edit(AuditQuestion $question)
     {
-        return view('questions.edit', [
-            'pergunta' => $question,
-        ]);
+        return view('questions.edit', ['pergunta' => $question]);
     }
 
     public function update(Request $request, AuditQuestion $question)
     {
         $dados = $this->validarDados($request, $question->id);
-
         $question->update($dados);
 
-        return redirect()
-            ->route('questions.index')
-            ->with('status', 'Pergunta atualizada com sucesso.');
+        return redirect()->route('questions.index')->with('status', 'Pergunta atualizada com sucesso.');
     }
 
     public function destroy(AuditQuestion $question)
     {
         $question->delete();
 
-        return redirect()
-            ->route('questions.index')
-            ->with('status', 'Pergunta removida.');
+        return redirect()->route('questions.index')->with('status', 'Pergunta removida.');
     }
 
     private function validarDados(Request $request, ?int $ignorarId = null): array
     {
         return $request->validate([
-            'codigo' => [
-                'required',
-                'string',
-                'max:30',
-                'unique:audit_questions,codigo,' . $ignorarId,
-            ],
+            'codigo' => ['required', 'string', 'max:30', 'unique:audit_questions,codigo,'.$ignorarId],
             'texto_pergunta' => ['required', 'string'],
             'categoria' => ['nullable', 'string', 'max:100'],
             'aba_excel' => ['required', 'string', 'max:100'],

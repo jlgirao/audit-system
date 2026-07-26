@@ -16,11 +16,12 @@ class AdminUserSeeder extends Seeder
                 'nome' => 'Administrador',
                 'senha_hash' => Hash::make('trocar-esta-senha'),
                 'ativo' => true,
+                'deve_alterar_senha' => true,
             ]
         );
 
         $admin->assignRole('admin');
 
-        $this->command->warn('Usuário admin criado: admin@empresa.com / trocar-esta-senha — troque a senha no primeiro acesso.');
+        $this->command->warn('Usuário admin criado: admin@empresa.com / trocar-esta-senha — a troca de senha será exigida no primeiro login.');
     }
 }

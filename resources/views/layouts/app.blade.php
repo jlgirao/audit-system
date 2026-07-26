@@ -39,7 +39,7 @@
     </div>
     <div>
         @auth
-            {{ auth()->user()->nome }}
+            <a href="{{ route('conta.editar') }}">{{ auth()->user()->nome }}</a>
             <form action="{{ route('logout') }}" method="POST" style="display:inline">
                 @csrf
                 <button type="submit" style="margin-top:0;">Sair</button>

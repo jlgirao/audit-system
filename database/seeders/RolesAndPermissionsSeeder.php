@@ -21,6 +21,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'preencher-respostas',
             'revisar-processo',
             'aprovar-processo',
+            'concluir-processo', // NOVO: separado de aprovar, ver ponto 6
             'reabrir-processo',
         ];
 
@@ -28,9 +29,14 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permissao]);
         }
 
+        // Admin sempre acumula todas as permissões existentes, incluindo
+        // as que forem criadas no futuro (rodar o seeder de novo já cobre).
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->syncPermissions(Permission::all());
 
+        // Analista NÃO recebe aprovar-processo nem concluir-processo —
+        // por isso essas opções não aparecem nem ficam disponíveis para
+        // ele na tela de transição de status (ponto 6).
         $analista = Role::firstOrCreate(['name' => 'analista']);
         $analista->syncPermissions([
             'criar-processo',
@@ -41,12 +47,11 @@ class RolesAndPermissionsSeeder extends Seeder
         $auditor->syncPermissions([
             'revisar-processo',
             'aprovar-processo',
+            'concluir-processo',
             'reabrir-processo',
         ]);
 
-        // Nota: como um usuário pode ter os dois perfis (analista + auditor),
-        // basta atribuir ambos os papéis a ele no cadastro de usuário —
-        // as permissões se acumulam automaticamente (ver seção 2.1 do
-        // documento técnico).
+        // Um usuário pode ter os dois perfis (analista + auditor) — as
+        // permissões se acumulam automaticamente, sem lógica especial.
     }
 }

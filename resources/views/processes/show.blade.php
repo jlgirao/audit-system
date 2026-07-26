@@ -13,6 +13,14 @@
         </span>
     </div>
 
+    @if ($processo->descricao)
+        <p>{{ $processo->descricao }}</p>
+    @endif
+
+    @if ($podeEditar)
+        <a class="btn" href="{{ route('processes.edit', $processo) }}">Editar processo</a>
+    @endif
+
     <h3>Responsáveis</h3>
     <ul>
         @foreach ($processo->responsaveis as $responsavel)
@@ -24,25 +32,25 @@
     <p><code>{{ $processo->dropbox_folder_path }}</code></p>
     <p style="color:#666; font-size:13px;">
         A sincronização de evidências e o pipeline de extração/IA serão adicionados nas próximas fases.
-        Por enquanto, esta tela cobre a estrutura de dados e o fluxo de status.
     </p>
 
-    <h3>Transicionar status</h3>
-    <form method="POST" action="{{ route('processes.transicionar', $processo) }}">
-        @csrf
-        <label>Novo status</label>
-        <select name="novo_status" required>
-            <option value="em_analise">Em análise</option>
-            <option value="em_revisao">Em revisão</option>
-            <option value="devolvido">Devolvido (requer comentário)</option>
-            <option value="aprovado">Aprovado</option>
-            <option value="concluido">Concluído</option>
-            <option value="reaberto">Reaberto (requer comentário)</option>
-        </select>
-        <label>Comentário</label>
-        <textarea name="comentario" rows="2"></textarea>
-        <button type="submit">Atualizar status</button>
-    </form>
+    @if (count($statusDisponiveis) > 0)
+        <h3>Transicionar status</h3>
+        <form method="POST" action="{{ route('processes.transicionar', $processo) }}">
+            @csrf
+            <label>Novo status</label>
+            <select name="novo_status" required>
+                @foreach ($statusDisponiveis as $status)
+                    <option value="{{ $status }}">{{ ucfirst(str_replace('_', ' ', $status)) }}</option>
+                @endforeach
+            </select>
+            <label>Comentário</label>
+            <textarea name="comentario" rows="2"></textarea>
+            <button type="submit">Atualizar status</button>
+        </form>
+    @else
+        <p style="color:#666; font-size:13px;">Você não tem permissão para alterar o status deste processo.</p>
+    @endif
 
     <h3>Histórico de status</h3>
     <table>

@@ -11,6 +11,9 @@
         <label>Nome do processo</label>
         <input type="text" name="nome" value="{{ old('nome') }}" required>
 
+        <label>Descrição</label>
+        <textarea name="descricao" rows="3">{{ old('descricao') }}</textarea>
+
         <label>Caminho da pasta no Dropbox</label>
         <input type="text" name="dropbox_folder_path" placeholder="/Auditorias/Processo_2026_001" value="{{ old('dropbox_folder_path') }}" required>
 

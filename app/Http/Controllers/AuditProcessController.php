@@ -5,28 +5,33 @@ namespace App\Http\Controllers;
 use App\Models\AuditProcess;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 
-class AuditProcessController extends Controller
+class AuditProcessController extends Controller implements HasMiddleware
 {
-    public function __construct()
+    public static function middleware(): array
     {
-        $this->middleware('auth');
+        return [
+            'auth',
+        ];
     }
 
     /**
-     * Lista de processos. Admin vê tudo; analista/auditor
-     * veem por padrão os processos em que estão atribuídos
-     * (pode ser sobrescrito com ?todos=1 se tiver permissão).
+     * Lista de processos.
+     * Ponto 3: admin (ou qualquer usuário com "ver-todos-processos") vê
+     * todos os processos por padrão, sem precisar de parâmetro na URL.
+     * Ele pode opcionalmente filtrar só os seus com ?meus=1.
      */
     public function index(Request $request)
     {
         $usuario = $request->user();
+        $podeVerTodos = $usuario->can('ver-todos-processos');
 
         $query = AuditProcess::query()->with('responsaveis');
 
-        $verTodos = $request->boolean('todos') && $usuario->can('ver-todos-processos');
+        $mostrandoTodos = $podeVerTodos && ! $request->boolean('meus');
 
-        if (! $verTodos) {
+        if (! $mostrandoTodos) {
             $query->whereHas('responsaveis', fn ($q) => $q->where('users.id', $usuario->id));
         }
 
@@ -43,7 +48,11 @@ class AuditProcessController extends Controller
 
         $processos = $query->orderByDesc('updated_at')->paginate(15)->withQueryString();
 
-        return view('processes.index', compact('processos', 'verTodos'));
+        return view('processes.index', [
+            'processos' => $processos,
+            'podeVerTodos' => $podeVerTodos,
+            'mostrandoTodos' => $mostrandoTodos,
+        ]);
     }
 
     public function create()
@@ -57,6 +66,7 @@ class AuditProcessController extends Controller
     {
         $dados = $request->validate([
             'nome' => ['required', 'string', 'max:200'],
+            'descricao' => ['nullable', 'string'],
             'dropbox_folder_path' => ['required', 'string', 'max:500'],
             'responsaveis' => ['required', 'array', 'min:1'],
             'responsaveis.*' => ['exists:users,id'],
@@ -65,6 +75,7 @@ class AuditProcessController extends Controller
 
         $processo = AuditProcess::create([
             'nome' => $dados['nome'],
+            'descricao' => $dados['descricao'] ?? null,
             'dropbox_folder_path' => $dados['dropbox_folder_path'],
             'status' => 'criado',
             'criado_por' => $request->user()->id,
@@ -89,13 +100,66 @@ class AuditProcessController extends Controller
     {
         $process->load(['responsaveis', 'historicoStatus.usuario', 'respostas.pergunta', 'evidencias']);
 
-        return view('processes.show', ['processo' => $process]);
+        return view('processes.show', [
+            'processo' => $process,
+            'podeEditar' => $process->podeSerEditadoPor(request()->user()),
+            'statusDisponiveis' => $process->statusDisponiveisPara(request()->user()),
+        ]);
     }
 
     /**
-     * Transições de estado simples da Fase 0. As regras de quem pode
-     * transicionar de qual status para qual devem evoluir para uma
-     * Policy dedicada nas próximas fases.
+     * Ponto 4: edição de nome/descrição/responsáveis. Autorização:
+     * responsável do processo ou admin (ver AuditProcess::podeSerEditadoPor).
+     */
+    public function edit(AuditProcess $process)
+    {
+        abort_unless($process->podeSerEditadoPor(request()->user()), 403);
+
+        $usuarios = User::where('ativo', true)->orderBy('nome')->get();
+        $process->load('responsaveis');
+
+        return view('processes.edit', ['processo' => $process, 'usuarios' => $usuarios]);
+    }
+
+    public function update(Request $request, AuditProcess $process)
+    {
+        abort_unless($process->podeSerEditadoPor($request->user()), 403);
+
+        $dados = $request->validate([
+            'nome' => ['required', 'string', 'max:200'],
+            'descricao' => ['nullable', 'string'],
+            'dropbox_folder_path' => ['required', 'string', 'max:500'],
+            'responsaveis' => ['required', 'array', 'min:1'],
+            'responsaveis.*' => ['exists:users,id'],
+            'papel_principal' => ['required', 'exists:users,id'],
+        ]);
+
+        $process->update([
+            'nome' => $dados['nome'],
+            'descricao' => $dados['descricao'] ?? null,
+            'dropbox_folder_path' => $dados['dropbox_folder_path'],
+        ]);
+
+        // Resincroniza responsáveis por completo (mais simples e previsível
+        // do que tentar calcular diffs de adição/remoção).
+        $process->responsaveis()->detach();
+
+        foreach ($dados['responsaveis'] as $userId) {
+            $process->responsaveis()->attach($userId, [
+                'papel_no_processo' => $userId == $dados['papel_principal']
+                    ? 'responsavel_principal'
+                    : 'colaborador',
+                'atribuido_por' => $request->user()->id,
+                'atribuido_em' => now(),
+            ]);
+        }
+
+        return redirect()->route('processes.show', $process)->with('status', 'Processo atualizado com sucesso.');
+    }
+
+    /**
+     * Ponto 5 e 6: valida no servidor (não só na tela) se o usuário tem
+     * permissão para o status pedido, usando AuditProcess::statusDisponiveisPara.
      */
     public function transicionar(Request $request, AuditProcess $process)
     {
@@ -103,6 +167,14 @@ class AuditProcessController extends Controller
             'novo_status' => ['required', 'in:em_analise,em_revisao,devolvido,aprovado,concluido,reaberto'],
             'comentario' => ['nullable', 'string'],
         ]);
+
+        $permitidos = $process->statusDisponiveisPara($request->user());
+
+        if (! in_array($dados['novo_status'], $permitidos, true)) {
+            return back()->withErrors([
+                'novo_status' => 'Você não tem permissão para mover este processo para este status.',
+            ]);
+        }
 
         if (in_array($dados['novo_status'], ['devolvido', 'reaberto']) && empty($dados['comentario'])) {
             return back()->withErrors(['comentario' => 'Informe o motivo para esta transição.']);

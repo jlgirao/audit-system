@@ -5,10 +5,11 @@
     "require": {
         "php": "^8.2",
         "laravel/framework": "^11.0",
-        "spatie/laravel-permission": "^6.9"
+        "spatie/laravel-permission": "^6.25"
     },
     "require-dev": {
-        "laravel/tinker": "^2.9"
+        "laravel/tinker": "^2.9",
+        "laravel/pail": "^1.2"
     },
     "autoload": {
         "psr-4": {
