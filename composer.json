@@ -1,0 +1,20 @@
+{
+    "name": "empresa/sistema-auditoria",
+    "type": "project",
+    "description": "Sistema de automação de preenchimento de auditoria",
+    "require": {
+        "php": "^8.2",
+        "laravel/framework": "^11.0",
+        "spatie/laravel-permission": "^6.9"
+    },
+    "require-dev": {
+        "laravel/tinker": "^2.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    }
+}
