@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\GenerateEmbeddingJob;
+use App\Jobs\MatchEvidenceToQuestionsJob;
 use App\Jobs\SyncProcessEvidenceJob;
 use App\Models\AuditProcess;
 use App\Models\User;
@@ -28,7 +30,13 @@ class AuditProcessController extends Controller implements HasMiddleware
         $usuario = $request->user();
         $podeVerTodos = $usuario->can('ver-todos-processos');
 
-        $query = AuditProcess::query()->with('responsaveis');
+        $query = AuditProcess::query()
+            ->with('responsaveis')
+            ->withCount([
+                'evidencias as evidencias_pendentes_count' => fn ($q) => $q->whereIn('status_processamento', ['pendente', 'processando']),
+                'evidencias as evidencias_ia_processando_count' => fn ($q) => $q->where('status_ia', 'processando'),
+                'arquivosSaida as excel_processando_count' => fn ($q) => $q->where('status', 'processando'),
+            ]);
 
         $mostrandoTodos = $podeVerTodos && ! $request->boolean('meus');
 
@@ -99,12 +107,42 @@ class AuditProcessController extends Controller implements HasMiddleware
 
     public function show(AuditProcess $process)
     {
-        $process->load(['responsaveis', 'historicoStatus.usuario', 'respostas.pergunta', 'evidencias', 'arquivosSaida.geradoPor']);
+        $process->load([
+            'responsaveis',
+            'historicoStatus.usuario',
+            'respostas.pergunta',
+            'evidencias' => fn ($query) => $query->withCount('matches'),
+            'arquivosSaida.geradoPor',
+        ]);
+
+        $pendentesExtracao = $process->evidencias->whereIn('status_processamento', ['pendente', 'processando'])->count();
+        $iaProcessando = $process->evidencias->where('status_ia', 'processando')->count();
+        $iaAguardando = $process->evidencias->whereNotNull('texto_extraido')->where('status_ia', 'pendente')->count();
+        $excelProcessando = $process->arquivosSaida->where('status', 'processando')->count();
+        $sincronizandoAgora = in_array($process->status_sincronizacao, ['na_fila', 'sincronizando'], true);
+
+        $resumoIa = [
+            'com_texto' => $process->evidencias->whereNotNull('texto_extraido')->count(),
+            'com_embedding' => $process->evidencias->whereNotNull('embedding_vector')->count(),
+            'sugestoes' => $process->evidencias->sum('matches_count'),
+            'pendentes_extracao' => $pendentesExtracao,
+            'ia_processando' => $iaProcessando,
+            'ia_aguardando' => $iaAguardando,
+            'excel_processando' => $excelProcessando,
+            'sincronizando_agora' => $sincronizandoAgora,
+            'status_sincronizacao' => $process->status_sincronizacao,
+            // "aguardando" não entra aqui de propósito: significa que
+            // ninguém clicou em "Rodar matching por IA" ainda, não que
+            // algo está rodando agora — não faz sentido a página ficar
+            // se atualizando sozinha à toa nesse caso.
+            'em_processamento' => $pendentesExtracao > 0 || $iaProcessando > 0 || $excelProcessando > 0 || $sincronizandoAgora,
+        ];
 
         return view('processes.show', [
             'processo' => $process,
             'podeEditar' => $process->podeSerEditadoPor(request()->user()),
             'statusDisponiveis' => $process->statusDisponiveisPara(request()->user()),
+            'resumoIa' => $resumoIa,
         ]);
     }
 
@@ -159,12 +197,43 @@ class AuditProcessController extends Controller implements HasMiddleware
     }
 
     /**
+     * Dispara (ou redispara) o matching por IA para todas as evidências já
+     * extraídas do processo — útil depois de ajustar o prompt/modelo em
+     * /admin/ia, ou para evidências sincronizadas antes da Fase 3 existir.
+     */
+    public function rodarMatching(Request $request, AuditProcess $process)
+    {
+        abort_unless($process->podeSerEditadoPor($request->user()), 403);
+
+        $evidencias = $process->evidencias()
+            ->where('status_processamento', 'concluido')
+            ->whereNotNull('texto_extraido')
+            ->get();
+
+        foreach ($evidencias as $evidencia) {
+            if ($evidencia->embedding_vector) {
+                MatchEvidenceToQuestionsJob::dispatch($evidencia->id);
+            } else {
+                GenerateEmbeddingJob::dispatch($evidencia->id);
+            }
+        }
+
+        return redirect()->route('processes.show', $process)
+            ->with('status', "Matching por IA iniciado para {$evidencias->count()} evidência(s) — atualize a tela de respostas em instantes.");
+    }
+
+    /**
      * Dispara a sincronização de evidências deste processo com o Dropbox.
      * Mesma autorização da edição: responsável atribuído ou admin.
      */
     public function sincronizar(Request $request, AuditProcess $process)
     {
         abort_unless($process->podeSerEditadoPor($request->user()), 403);
+
+        // Marca "na_fila" já aqui, antes do job ser efetivamente
+        // processado pelo worker — cobre o período de espera na fila,
+        // que pode ser longo se houver outros jobs pesados na frente.
+        $process->update(['status_sincronizacao' => 'na_fila']);
 
         SyncProcessEvidenceJob::dispatch($process->id);
 
@@ -198,5 +267,19 @@ class AuditProcessController extends Controller implements HasMiddleware
         $process->transicionarStatus($dados['novo_status'], $request->user()->id, $dados['comentario'] ?? null);
 
         return redirect()->route('processes.show', $process)->with('status', 'Status atualizado.');
+    }
+
+    /**
+     * Exclusão (soft delete — preserva o registro para fins de auditoria,
+     * só deixa de aparecer nas listagens). Restrito à permissão
+     * "excluir-processo", que hoje só o perfil admin tem.
+     */
+    public function destroy(Request $request, AuditProcess $process)
+    {
+        abort_unless($request->user()->can('excluir-processo'), 403);
+
+        $process->delete();
+
+        return redirect()->route('processes.index')->with('status', 'Processo excluído com sucesso.');
     }
 }

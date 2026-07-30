@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class SyncProcessEvidenceJob implements ShouldQueue
 {
@@ -46,17 +47,31 @@ class SyncProcessEvidenceJob implements ShouldQueue
             return;
         }
 
+        // Marca "sincronizando" assim que o job REALMENTE começa a rodar —
+        // diferente de "na_fila" (marcado no controller/comando antes de
+        // despachar), isso cobre o momento em que o worker pegou o job de
+        // verdade, útil quando há mais de um worker ou fila congestionada.
+        $process->update(['status_sincronizacao' => 'sincronizando']);
+
         try {
-            if ($process->dropbox_cursor) {
-                $this->processarPagina($process, $client->continuarListagem($process->dropbox_cursor), $client, houveSincronizacaoAnterior: true);
-            } else {
+            try {
+                if ($process->dropbox_cursor) {
+                    $this->processarPagina($process, $client->continuarListagem($process->dropbox_cursor), $client, houveSincronizacaoAnterior: true);
+                } else {
+                    $this->processarPagina($process, $client->listarPasta($process->dropbox_folder_path), $client, houveSincronizacaoAnterior: false);
+                }
+            } catch (DropboxCursorInvalidoException $e) {
+                // Cursor não é mais válido (ex: pasta recriada) — reinicia do zero.
+                Log::warning("Cursor inválido para o processo {$process->id}, reiniciando sincronização.", ['erro' => $e->getMessage()]);
+                $process->update(['dropbox_cursor' => null]);
                 $this->processarPagina($process, $client->listarPasta($process->dropbox_folder_path), $client, houveSincronizacaoAnterior: false);
             }
-        } catch (DropboxCursorInvalidoException $e) {
-            // Cursor não é mais válido (ex: pasta recriada) — reinicia do zero.
-            Log::warning("Cursor inválido para o processo {$process->id}, reiniciando sincronização.", ['erro' => $e->getMessage()]);
-            $process->update(['dropbox_cursor' => null]);
-            $this->processarPagina($process, $client->listarPasta($process->dropbox_folder_path), $client, houveSincronizacaoAnterior: false);
+
+            $process->update(['status_sincronizacao' => 'concluido']);
+        } catch (Throwable $e) {
+            $process->update(['status_sincronizacao' => 'erro']);
+
+            throw $e; // preserva o comportamento normal de retry/failed_jobs do Laravel
         }
     }
 

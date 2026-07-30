@@ -32,6 +32,7 @@ class AuditProcess extends Model
         'dropbox_folder_path',
         'dropbox_cursor',
         'tem_arquivos_novos',
+        'status_sincronizacao',
         'criado_por',
     ];
 

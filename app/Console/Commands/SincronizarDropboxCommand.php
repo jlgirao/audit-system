@@ -24,6 +24,7 @@ class SincronizarDropboxCommand extends Command
         $processos = AuditProcess::whereNotIn('status', ['concluido'])->get();
 
         foreach ($processos as $processo) {
+            $processo->update(['status_sincronizacao' => 'na_fila']);
             SyncProcessEvidenceJob::dispatch($processo->id);
         }
 

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f4; color: #222; }
-        header { background: #1f2937; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+        header { background: #1f2937; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
         header a { color: #fff; text-decoration: none; margin-right: 16px; }
         main { padding: 24px; max-width: 1100px; margin: 0 auto; }
         table { width: 100%; border-collapse: collapse; background: #fff; }
@@ -42,12 +42,16 @@
         <a href="{{ route('processes.index') }}">Processos</a>
         @can('gerenciar-perguntas')
             <a href="{{ route('questions.index') }}">Perguntas</a>
+            <a href="{{ route('admin.template.index') }}">Template Excel</a>
         @endcan
         @can('gerenciar-usuarios')
             <a href="{{ route('admin.users.index') }}">Usuários</a>
         @endcan
         @can('configurar-dropbox')
             <a href="{{ route('admin.dropbox.index') }}">Dropbox</a>
+        @endcan
+        @can('configurar-ia')
+            <a href="{{ route('admin.ia.index') }}">IA</a>
         @endcan
     </div>
     <div>

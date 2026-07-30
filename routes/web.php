@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AiConfigController;
 use App\Http\Controllers\Admin\DropboxConnectionController;
 use App\Http\Controllers\Admin\TemplateController;
 use App\Http\Controllers\Admin\UserController;
@@ -39,16 +40,19 @@ Route::middleware('auth')->group(function () {
     Route::put('/processos/{process}', [AuditProcessController::class, 'update'])->name('processes.update');
     Route::post('/processos/{process}/transicionar', [AuditProcessController::class, 'transicionar'])
         ->name('processes.transicionar');
+    Route::delete('/processos/{process}', [AuditProcessController::class, 'destroy'])->name('processes.destroy');
     Route::post('/processos/{process}/sincronizar', [AuditProcessController::class, 'sincronizar'])
         ->name('processes.sincronizar');
     Route::get('/dropbox/pastas', [DropboxBrowseController::class, 'pastas'])->name('dropbox.pastas');
 
     Route::get('/processos/{process}/respostas', [ProcessAnswerController::class, 'edit'])->name('processes.respostas.edit');
     Route::put('/processos/{process}/respostas', [ProcessAnswerController::class, 'update'])->name('processes.respostas.update');
+    Route::post('/processos/{process}/respostas/aplicar-nao', [ProcessAnswerController::class, 'aplicarNaoAsPendentes'])->name('processes.respostas.aplicar_nao');
 
     Route::post('/processos/{process}/excel', [OutputFileController::class, 'gerar'])->name('processes.excel.gerar');
     Route::get('/processos/{process}/excel/{outputFile}', [OutputFileController::class, 'download'])->name('processes.excel.download');
     Route::post('/processos/{process}/evidencias/{evidence}/reprocessar', [EvidenceController::class, 'reprocessar'])->name('evidences.reprocessar');
+    Route::post('/processos/{process}/matching', [AuditProcessController::class, 'rodarMatching'])->name('processes.matching');
 });
 
 // Perguntas de auditoria (admin)
@@ -68,6 +72,12 @@ Route::middleware('auth')->prefix('admin/dropbox')->name('admin.dropbox.')->grou
     Route::get('/conectar', [DropboxConnectionController::class, 'conectar'])->name('conectar');
     Route::get('/callback', [DropboxConnectionController::class, 'callback'])->name('callback');
     Route::delete('/', [DropboxConnectionController::class, 'desconectar'])->name('desconectar');
+});
+
+// Configuração da IA (admin)
+Route::middleware('auth')->prefix('admin/ia')->name('admin.ia.')->group(function () {
+    Route::get('/', [AiConfigController::class, 'index'])->name('index');
+    Route::put('/', [AiConfigController::class, 'update'])->name('update');
 });
 
 // Template fixo do Excel de auditoria (admin)

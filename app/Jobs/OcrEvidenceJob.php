@@ -83,6 +83,8 @@ class OcrEvidenceJob implements ShouldQueue
                 'status_processamento' => 'concluido',
                 'erro_detalhe' => null,
             ]);
+
+            GenerateEmbeddingJob::dispatch($evidencia->id);
         } catch (Throwable $e) {
             $evidencia->update([
                 'status_processamento' => 'erro',

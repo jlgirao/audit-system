@@ -21,6 +21,7 @@ class EvidenceFile extends Model
         'origem_texto',
         'classificacao',
         'status_processamento',
+        'status_ia',
         'erro_detalhe',
     ];
 

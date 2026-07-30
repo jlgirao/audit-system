@@ -18,6 +18,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver-logs',
             'criar-processo',
             'ver-todos-processos',
+            'excluir-processo',
             'preencher-respostas',
             'revisar-processo',
             'aprovar-processo',

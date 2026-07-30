@@ -16,6 +16,8 @@ class QuestionEvidenceMatch extends Model
         'evidence_file_id',
         'origem',
         'score_confianca',
+        'resposta_sugerida',
+        'parecer_sugerido',
         'status',
         'revisado_por',
         'revisado_em',

@@ -56,11 +56,26 @@
                     @if ($processo->tem_arquivos_novos)
                         <span title="Há arquivos novos no Dropbox">🔄</span>
                     @endif
+                    @if ($processo->evidencias_pendentes_count > 0 || $processo->evidencias_ia_processando_count > 0 || $processo->excel_processando_count > 0 || in_array($processo->status_sincronizacao, ['na_fila', 'sincronizando'], true))
+                        <span class="badge badge-em_analise" title="Ainda há tarefas em segundo plano rodando (sincronização, extração, IA ou Excel)">⏳ Processando</span>
+                    @endif
                 </td>
                 <td>{{ $processo->responsaveis->pluck('nome')->join(', ') }}</td>
                 <td><span class="badge badge-{{ $processo->status }}">{{ ucfirst(str_replace('_', ' ', $processo->status)) }}</span></td>
                 <td>{{ $processo->updated_at->diffForHumans() }}</td>
-                <td><a href="{{ route('processes.show', $processo) }}">Ver</a></td>
+                <td>
+                    <div class="acoes">
+                        <a href="{{ route('processes.show', $processo) }}" class="acao-btn acao-editar" title="Ver">👁️</a>
+                        @can('excluir-processo')
+                            <form method="POST" action="{{ route('processes.destroy', $processo) }}"
+                                onsubmit="return confirm('Excluir este processo? Ele deixa de aparecer nas listagens, mas o registro é preservado para fins de auditoria.');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="acao-btn acao-remover" title="Excluir">🗑️</button>
+                            </form>
+                        @endcan
+                    </div>
+                </td>
             </tr>
         @empty
             <tr><td colspan="6">Nenhum processo encontrado.</td></tr>

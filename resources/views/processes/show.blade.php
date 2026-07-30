@@ -3,6 +3,29 @@
 @section('titulo', $processo->nome)
 
 @section('conteudo')
+    @if ($resumoIa['em_processamento'])
+        <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:10px 16px; margin-bottom:16px; font-size:14px; color:#3730a3;">
+            ⏳ <strong>Este processo tem tarefas em segundo plano ainda rodando</strong> — a página vai se
+            atualizar sozinha a cada 15 segundos até tudo terminar.
+            <span style="font-size:12px; display:block; margin-top:4px; color:#4338ca;">
+                @if ($resumoIa['status_sincronizacao'] === 'na_fila')
+                    Sincronização com o Dropbox está na fila, aguardando a vez (pode demorar se houver outros processos na frente).
+                @elseif ($resumoIa['status_sincronizacao'] === 'sincronizando')
+                    Sincronizando com o Dropbox agora.
+                @endif
+                @if ($resumoIa['pendentes_extracao'] > 0)
+                    {{ $resumoIa['pendentes_extracao'] }} evidência(s) aguardando extração/OCR.
+                @endif
+                @if ($resumoIa['ia_processando'] > 0)
+                    {{ $resumoIa['ia_processando'] }} evidência(s) com embedding/matching de IA rodando agora.
+                @endif
+                @if ($resumoIa['excel_processando'] > 0)
+                    Geração de Excel em andamento.
+                @endif
+            </span>
+        </div>
+    @endif
+
     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
         <div>
             <h2 style="margin-bottom:4px;">{{ $processo->nome }}</h2>
@@ -21,6 +44,15 @@
         <a class="btn" href="{{ route('processes.edit', $processo) }}">Editar processo</a>
     @endif
 
+    @can('excluir-processo')
+        <form method="POST" action="{{ route('processes.destroy', $processo) }}" style="display:inline-block;"
+            onsubmit="return confirm('Excluir este processo? Ele deixa de aparecer nas listagens, mas o registro é preservado para fins de auditoria.');">
+            @csrf
+            @method('DELETE')
+            <button type="submit" style="background:#991b1b;">Excluir processo</button>
+        </form>
+    @endcan
+
     <h3>Responsáveis</h3>
     <ul>
         @foreach ($processo->responsaveis as $responsavel)
@@ -35,17 +67,31 @@
         @endif
     </p>
 
+    <p style="font-size:13px; color:#666;">
+        🤖 IA: {{ $resumoIa['com_texto'] }} evidência(s) com texto extraído,
+        {{ $resumoIa['com_embedding'] }} com embedding gerado,
+        {{ $resumoIa['sugestoes'] }} sugestão(ões) de match no total.
+        @if ($resumoIa['ia_aguardando'] > 0)
+            <br>{{ $resumoIa['ia_aguardando'] }} evidência(s) com texto pronto, mas ainda sem IA rodada —
+            clique em "Rodar matching por IA" abaixo para processá-las.
+        @endif
+    </p>
+
     @if ($podeEditar)
-        <form method="POST" action="{{ route('processes.sincronizar', $processo) }}">
+        <form method="POST" action="{{ route('processes.sincronizar', $processo) }}" style="display:inline-block; margin-right:8px;">
             @csrf
             <button type="submit">Sincronizar agora</button>
+        </form>
+        <form method="POST" action="{{ route('processes.matching', $processo) }}" style="display:inline-block;">
+            @csrf
+            <button type="submit">🤖 Rodar matching por IA</button>
         </form>
     @endif
 
     <h3>Evidências ({{ $processo->evidencias->count() }})</h3>
     <table>
         <thead>
-        <tr><th>Arquivo</th><th>Tipo</th><th>Status</th><th>Origem do texto</th><th>Observação</th><th></th></tr>
+        <tr><th>Arquivo</th><th>Tipo</th><th>Status</th><th>Origem do texto</th><th>Status IA</th><th>Observação</th><th></th></tr>
         </thead>
         <tbody>
         @forelse ($processo->evidencias as $evidencia)
@@ -64,6 +110,21 @@
                     @endif
                 </td>
                 <td>{{ $evidencia->origem_texto ? ucfirst($evidencia->origem_texto) : '—' }}</td>
+                <td style="font-size:12px;">
+                    @if (! $evidencia->texto_extraido)
+                        <span style="color:#999;">Aguardando texto</span>
+                    @elseif ($evidencia->status_ia === 'processando')
+                        <span style="color:#1d4ed8;">⏳ Processando…</span>
+                    @elseif ($evidencia->status_ia === 'erro')
+                        <span style="color:#991b1b;">Erro na IA</span>
+                    @elseif (! $evidencia->embedding_vector)
+                        <span style="color:#92400e;">Sem embedding ainda</span>
+                    @elseif ($evidencia->matches_count > 0)
+                        <span style="color:#166534;">{{ $evidencia->matches_count }} sugestão(ões)</span>
+                    @else
+                        <span style="color:#999;">Nenhuma sugestão (abaixo do limiar)</span>
+                    @endif
+                </td>
                 <td style="font-size:12px; color:#666;">{{ $evidencia->erro_detalhe ?? '—' }}</td>
                 <td>
                     @if ($podeEditar && in_array($evidencia->status_processamento, ['erro', 'pendente']))
@@ -75,7 +136,7 @@
                 </td>
             </tr>
         @empty
-            <tr><td colspan="6">Nenhuma evidência sincronizada ainda. Clique em "Sincronizar agora".</td></tr>
+            <tr><td colspan="7">Nenhuma evidência sincronizada ainda. Clique em "Sincronizar agora".</td></tr>
         @endforelse
         </tbody>
     </table>
@@ -167,4 +228,14 @@
         @endforelse
         </tbody>
     </table>
+
+    @if ($resumoIa['em_processamento'])
+        <script>
+            // Atualiza a página sozinha enquanto houver processamento pendente,
+            // para o usuário não precisar ficar clicando em atualizar. Para de
+            // atualizar automaticamente assim que tudo terminar (o banner some
+            // e este script deixa de ser renderizado no próximo carregamento).
+            setTimeout(() => window.location.reload(), 15000);
+        </script>
+    @endif
 @endsection
