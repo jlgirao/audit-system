@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SyncProcessEvidenceJob;
 use App\Models\AuditProcess;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -98,7 +99,7 @@ class AuditProcessController extends Controller implements HasMiddleware
 
     public function show(AuditProcess $process)
     {
-        $process->load(['responsaveis', 'historicoStatus.usuario', 'respostas.pergunta', 'evidencias']);
+        $process->load(['responsaveis', 'historicoStatus.usuario', 'respostas.pergunta', 'evidencias', 'arquivosSaida.geradoPor']);
 
         return view('processes.show', [
             'processo' => $process,
@@ -155,6 +156,20 @@ class AuditProcessController extends Controller implements HasMiddleware
         }
 
         return redirect()->route('processes.show', $process)->with('status', 'Processo atualizado com sucesso.');
+    }
+
+    /**
+     * Dispara a sincronização de evidências deste processo com o Dropbox.
+     * Mesma autorização da edição: responsável atribuído ou admin.
+     */
+    public function sincronizar(Request $request, AuditProcess $process)
+    {
+        abort_unless($process->podeSerEditadoPor($request->user()), 403);
+
+        SyncProcessEvidenceJob::dispatch($process->id);
+
+        return redirect()->route('processes.show', $process)
+            ->with('status', 'Sincronização com o Dropbox iniciada — os arquivos devem aparecer em instantes.');
     }
 
     /**

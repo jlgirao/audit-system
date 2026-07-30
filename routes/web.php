@@ -1,10 +1,16 @@
 <?php
 
+use App\Http\Controllers\Admin\DropboxConnectionController;
+use App\Http\Controllers\Admin\TemplateController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuditProcessController;
 use App\Http\Controllers\AuditQuestionController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\DropboxBrowseController;
+use App\Http\Controllers\EvidenceController;
+use App\Http\Controllers\OutputFileController;
+use App\Http\Controllers\ProcessAnswerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('processes.index'));
@@ -33,6 +39,16 @@ Route::middleware('auth')->group(function () {
     Route::put('/processos/{process}', [AuditProcessController::class, 'update'])->name('processes.update');
     Route::post('/processos/{process}/transicionar', [AuditProcessController::class, 'transicionar'])
         ->name('processes.transicionar');
+    Route::post('/processos/{process}/sincronizar', [AuditProcessController::class, 'sincronizar'])
+        ->name('processes.sincronizar');
+    Route::get('/dropbox/pastas', [DropboxBrowseController::class, 'pastas'])->name('dropbox.pastas');
+
+    Route::get('/processos/{process}/respostas', [ProcessAnswerController::class, 'edit'])->name('processes.respostas.edit');
+    Route::put('/processos/{process}/respostas', [ProcessAnswerController::class, 'update'])->name('processes.respostas.update');
+
+    Route::post('/processos/{process}/excel', [OutputFileController::class, 'gerar'])->name('processes.excel.gerar');
+    Route::get('/processos/{process}/excel/{outputFile}', [OutputFileController::class, 'download'])->name('processes.excel.download');
+    Route::post('/processos/{process}/evidencias/{evidence}/reprocessar', [EvidenceController::class, 'reprocessar'])->name('evidences.reprocessar');
 });
 
 // Perguntas de auditoria (admin)
@@ -42,7 +58,22 @@ Route::middleware('auth')->prefix('perguntas')->name('questions.')->group(functi
     Route::post('/', [AuditQuestionController::class, 'store'])->name('store');
     Route::get('/{question}/editar', [AuditQuestionController::class, 'edit'])->name('edit');
     Route::put('/{question}', [AuditQuestionController::class, 'update'])->name('update');
+    Route::post('/{question}/duplicar', [AuditQuestionController::class, 'duplicar'])->name('duplicar');
     Route::delete('/{question}', [AuditQuestionController::class, 'destroy'])->name('destroy');
+});
+
+// Conexão com o Dropbox (admin)
+Route::middleware('auth')->prefix('admin/dropbox')->name('admin.dropbox.')->group(function () {
+    Route::get('/', [DropboxConnectionController::class, 'index'])->name('index');
+    Route::get('/conectar', [DropboxConnectionController::class, 'conectar'])->name('conectar');
+    Route::get('/callback', [DropboxConnectionController::class, 'callback'])->name('callback');
+    Route::delete('/', [DropboxConnectionController::class, 'desconectar'])->name('desconectar');
+});
+
+// Template fixo do Excel de auditoria (admin)
+Route::middleware('auth')->prefix('admin/template')->name('admin.template.')->group(function () {
+    Route::get('/', [TemplateController::class, 'index'])->name('index');
+    Route::post('/', [TemplateController::class, 'store'])->name('store');
 });
 
 // Administração de usuários

@@ -16,7 +16,9 @@
             <th>Aba</th>
             <th>Linha</th>
             <th>Col. Resposta</th>
-            <th>Col. Evidência</th>
+            <th>Col. Observações</th>
+            <th>Col. Arq. Evidência</th>
+            <th>Col. Parecer</th>
             <th></th>
         </tr>
         </thead>
@@ -27,18 +29,26 @@
                 <td>{{ $pergunta->texto_pergunta }}</td>
                 <td>{{ $pergunta->aba_excel }}</td>
                 <td>{{ $pergunta->linha_excel }}</td>
-                <td>{{ $pergunta->coluna_resposta }}</td>
+                <td>{{ $pergunta->coluna_ha_evidencia ?? '⚠️ não definida' }}</td>
+                <td>{{ $pergunta->coluna_observacoes }}</td>
                 <td>{{ $pergunta->coluna_evidencia }}</td>
+                <td>{{ $pergunta->coluna_parecer ?? '⚠️ não definida' }}</td>
                 <td>
-                    <a href="{{ route('questions.edit', $pergunta) }}">Editar</a>
-                    <form method="POST" action="{{ route('questions.destroy', $pergunta) }}" style="display:inline" onsubmit="return confirm('Remover esta pergunta?');">
-                        @csrf @method('DELETE')
-                        <button type="submit" style="margin:0; background:#991b1b;">Remover</button>
-                    </form>
+                    <div class="acoes">
+                        <a href="{{ route('questions.edit', $pergunta) }}" class="acao-btn acao-editar" title="Editar">✏️</a>
+                        <form method="POST" action="{{ route('questions.duplicar', $pergunta) }}">
+                            @csrf
+                            <button type="submit" class="acao-btn acao-duplicar" title="Duplicar">📋</button>
+                        </form>
+                        <form method="POST" action="{{ route('questions.destroy', $pergunta) }}" onsubmit="return confirm('Remover esta pergunta?');">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="acao-btn acao-remover" title="Remover">🗑️</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
         @empty
-            <tr><td colspan="7">Nenhuma pergunta cadastrada.</td></tr>
+            <tr><td colspan="9">Nenhuma pergunta cadastrada.</td></tr>
         @endforelse
         </tbody>
     </table>

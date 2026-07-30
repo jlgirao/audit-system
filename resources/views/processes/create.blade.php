@@ -14,8 +14,7 @@
         <label>Descrição</label>
         <textarea name="descricao" rows="3">{{ old('descricao') }}</textarea>
 
-        <label>Caminho da pasta no Dropbox</label>
-        <input type="text" name="dropbox_folder_path" placeholder="/Auditorias/Processo_2026_001" value="{{ old('dropbox_folder_path') }}" required>
+        @include('processes._dropbox_picker', ['valorAtual' => ''])
 
         <label>Responsáveis (selecione um ou mais)</label>
         <select name="responsaveis[]" multiple size="6" required>

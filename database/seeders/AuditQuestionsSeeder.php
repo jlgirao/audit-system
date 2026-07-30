@@ -8,11 +8,10 @@ use Illuminate\Database\Seeder;
 class AuditQuestionsSeeder extends Seeder
 {
     /**
-     * Este seeder traz 3 perguntas de EXEMPLO só para você validar
-     * a estrutura. Substitua pelo conteúdo real do seu Excel de
-     * auditoria — o ideal é gerar este arquivo a partir de uma
-     * exportação do template (uma linha por pergunta), não digitar
-     * manualmente dezenas/centenas de perguntas aqui.
+     * Perguntas de EXEMPLO — substitua pelo conteúdo real do seu Excel de
+     * auditoria. Cada pergunta agora tem 4 colunas de saída configuráveis:
+     * Resposta (Sim/Não/Não aplicável), Observações, Arquivo da Evidência
+     * e Parecer.
      */
     public function run(): void
     {
@@ -23,8 +22,10 @@ class AuditQuestionsSeeder extends Seeder
                 'categoria' => 'Financeiro',
                 'aba_excel' => 'Financeiro',
                 'linha_excel' => 5,
-                'coluna_resposta' => 'D',
-                'coluna_evidencia' => 'E',
+                'coluna_ha_evidencia' => 'D',
+                'coluna_observacoes' => 'E',
+                'coluna_evidencia' => 'F',
+                'coluna_parecer' => 'G',
                 'ordem' => 1,
             ],
             [
@@ -33,8 +34,10 @@ class AuditQuestionsSeeder extends Seeder
                 'categoria' => 'Compliance',
                 'aba_excel' => 'Compliance',
                 'linha_excel' => 8,
-                'coluna_resposta' => 'D',
-                'coluna_evidencia' => 'E',
+                'coluna_ha_evidencia' => 'D',
+                'coluna_observacoes' => 'E',
+                'coluna_evidencia' => 'F',
+                'coluna_parecer' => 'G',
                 'ordem' => 2,
             ],
             [
@@ -43,14 +46,16 @@ class AuditQuestionsSeeder extends Seeder
                 'categoria' => 'Fornecedores',
                 'aba_excel' => 'Fornecedores',
                 'linha_excel' => 3,
-                'coluna_resposta' => 'D',
-                'coluna_evidencia' => 'E',
+                'coluna_ha_evidencia' => 'D',
+                'coluna_observacoes' => 'E',
+                'coluna_evidencia' => 'F',
+                'coluna_parecer' => 'G',
                 'ordem' => 3,
             ],
         ];
 
         foreach ($perguntas as $pergunta) {
-            AuditQuestion::firstOrCreate(['codigo' => $pergunta['codigo']], $pergunta);
+            AuditQuestion::updateOrCreate(['codigo' => $pergunta['codigo']], $pergunta);
         }
     }
 }

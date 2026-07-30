@@ -9,9 +9,9 @@ class ProcessAnswer extends Model
     protected $fillable = [
         'process_id',
         'question_id',
-        'resposta_texto',
-        'tipo_resposta',
-        'justificativa',
+        'ha_evidencia',
+        'observacoes',
+        'parecer',
         'preenchido_por',
         'preenchido_em',
     ];

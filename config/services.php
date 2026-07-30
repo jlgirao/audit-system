@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    // Adicionado para a Fase 1: conexão OAuth2 com o Dropbox.
+    'dropbox' => [
+        'client_id' => env('DROPBOX_APP_KEY'),
+        'client_secret' => env('DROPBOX_APP_SECRET'),
+        'redirect' => env('APP_URL').'/admin/dropbox/callback',
+    ],
+
 ];

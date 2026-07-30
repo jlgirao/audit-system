@@ -29,10 +29,106 @@
     </ul>
 
     <h3>Pasta no Dropbox</h3>
-    <p><code>{{ $processo->dropbox_folder_path }}</code></p>
-    <p style="color:#666; font-size:13px;">
-        A sincronização de evidências e o pipeline de extração/IA serão adicionados nas próximas fases.
+    <p><code>{{ $processo->dropbox_folder_path }}</code>
+        @if ($processo->tem_arquivos_novos)
+            <span style="color:#92400e;">🔄 há arquivos novos desde a última sincronização</span>
+        @endif
     </p>
+
+    @if ($podeEditar)
+        <form method="POST" action="{{ route('processes.sincronizar', $processo) }}">
+            @csrf
+            <button type="submit">Sincronizar agora</button>
+        </form>
+    @endif
+
+    <h3>Evidências ({{ $processo->evidencias->count() }})</h3>
+    <table>
+        <thead>
+        <tr><th>Arquivo</th><th>Tipo</th><th>Status</th><th>Origem do texto</th><th>Observação</th><th></th></tr>
+        </thead>
+        <tbody>
+        @forelse ($processo->evidencias as $evidencia)
+            <tr>
+                <td>{{ $evidencia->nome_arquivo }}</td>
+                <td>{{ strtoupper($evidencia->tipo_arquivo) }}</td>
+                <td>
+                    @if ($evidencia->status_processamento === 'erro')
+                        <span class="badge badge-devolvido">Erro</span>
+                    @elseif ($evidencia->status_processamento === 'concluido')
+                        <span class="badge badge-concluido">Concluído</span>
+                    @elseif ($evidencia->status_processamento === 'processando')
+                        <span class="badge badge-em_analise">Processando…</span>
+                    @else
+                        <span class="badge badge-criado">{{ ucfirst($evidencia->status_processamento) }}</span>
+                    @endif
+                </td>
+                <td>{{ $evidencia->origem_texto ? ucfirst($evidencia->origem_texto) : '—' }}</td>
+                <td style="font-size:12px; color:#666;">{{ $evidencia->erro_detalhe ?? '—' }}</td>
+                <td>
+                    @if ($podeEditar && in_array($evidencia->status_processamento, ['erro', 'pendente']))
+                        <form method="POST" action="{{ route('evidences.reprocessar', [$processo, $evidencia]) }}">
+                            @csrf
+                            <button type="submit" class="acao-btn acao-duplicar" title="Reprocessar">🔄</button>
+                        </form>
+                    @endif
+                </td>
+            </tr>
+        @empty
+            <tr><td colspan="6">Nenhuma evidência sincronizada ainda. Clique em "Sincronizar agora".</td></tr>
+        @endforelse
+        </tbody>
+    </table>
+    <p style="color:#666; font-size:13px;">
+        Imagens (PNG/JPEG) e PDFs escaneados agora passam por OCR automaticamente (Fase 2).
+        O matching automático com as perguntas entra na Fase 3.
+    </p>
+
+    @if ($podeEditar)
+        <a class="btn" href="{{ route('processes.respostas.edit', $processo) }}">Responder perguntas</a>
+    @endif
+
+    <h3>Excel de saída</h3>
+    @if ($podeEditar)
+        <form method="POST" action="{{ route('processes.excel.gerar', $processo) }}">
+            @csrf
+            <button type="submit">Gerar nova versão do Excel</button>
+        </form>
+    @endif
+    <table style="margin-top:12px;">
+        <thead>
+        <tr><th>Versão</th><th>Status</th><th>Gerado em</th><th>Gerado por</th><th></th></tr>
+        </thead>
+        <tbody>
+        @forelse ($processo->arquivosSaida as $arquivo)
+            <tr>
+                <td>v{{ $arquivo->versao }}</td>
+                <td>
+                    @if ($arquivo->status === 'processando')
+                        <span class="badge badge-em_analise">Processando…</span>
+                    @elseif ($arquivo->status === 'erro')
+                        <span class="badge badge-devolvido" title="{{ $arquivo->erro_detalhe }}">Erro</span>
+                    @else
+                        <span class="badge badge-concluido">Concluído</span>
+                    @endif
+                </td>
+                <td>{{ \Illuminate\Support\Carbon::parse($arquivo->gerado_em)->format('d/m/Y H:i') }}</td>
+                <td>{{ $arquivo->geradoPor->nome }}</td>
+                <td>
+                    @if ($arquivo->status === 'concluido')
+                        <a href="{{ route('processes.excel.download', [$processo, $arquivo]) }}">Baixar</a>
+                    @elseif ($arquivo->status === 'erro')
+                        <span style="font-size:12px; color:#991b1b;">{{ $arquivo->erro_detalhe }}</span>
+                    @else
+                        —
+                    @endif
+                </td>
+            </tr>
+        @empty
+            <tr><td colspan="5">Nenhuma versão gerada ainda.</td></tr>
+        @endforelse
+        </tbody>
+    </table>
 
     @if (count($statusDisponiveis) > 0)
         <h3>Transicionar status</h3>

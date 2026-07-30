@@ -11,6 +11,8 @@ class OutputFile extends Model
     protected $fillable = [
         'process_id',
         'versao',
+        'status',
+        'erro_detalhe',
         'caminho_arquivo',
         'caminho_dropbox',
         'gerado_por',

@@ -19,7 +19,7 @@
                 <td>{{ $usuario->email }}</td>
                 <td>{{ $usuario->roles->pluck('name')->map(fn($r) => ucfirst($r))->join(', ') }}</td>
                 <td>{{ $usuario->ativo ? 'Sim' : 'Não' }}</td>
-                <td><a href="{{ route('admin.users.edit', $usuario) }}">Editar</a></td>
+                <td><a href="{{ route('admin.users.edit', $usuario) }}" class="acao-btn acao-editar" title="Editar">✏️</a></td>
             </tr>
         @empty
             <tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>

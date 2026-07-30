@@ -15,8 +15,7 @@
         <label>Descrição</label>
         <textarea name="descricao" rows="3">{{ old('descricao', $processo->descricao) }}</textarea>
 
-        <label>Caminho da pasta no Dropbox</label>
-        <input type="text" name="dropbox_folder_path" value="{{ old('dropbox_folder_path', $processo->dropbox_folder_path) }}" required>
+        @include('processes._dropbox_picker', ['valorAtual' => $processo->dropbox_folder_path])
 
         <label>Responsáveis (selecione um ou mais)</label>
         <select name="responsaveis[]" multiple size="6" required>

@@ -1,123 +1,155 @@
-# Ajustes — Pontos 1 a 6
+# Fase 2 — OCR de imagens e PDFs escaneados
 
-Este pacote contém os arquivos **novos ou alterados** para atender aos 6
-pontos que você levantou. Ele parte da estrutura que você já ajustou para
-Laravel 11 / PHP 8.4 (padrão `HasMiddleware`, `bootstrap/app.php` sem
-`Kernel.php`), então mantive o mesmo estilo.
+Processa automaticamente o que ficava "pendente" desde a Fase 1: imagens
+(PNG/JPEG) e PDFs escaneados (sem texto nativo). Sem migration nova — usa
+as colunas que já existiam em `evidence_files` desde a Fase 0.
 
-## Como aplicar
+## Arquitetura (por que assim)
 
-### 1. Copiar os arquivos por cima do projeto
+- **Tesseract OCR** faz o reconhecimento de texto em si.
+- **Ghostscript**, chamado diretamente via linha de comando, converte
+  páginas de PDF em imagens PNG antes do OCR — evitamos depender da
+  extensão `Imagick` do PHP, que é notoriamente difícil de instalar e
+  configurar corretamente no Windows/XAMPP.
+- O encadeamento é automático: ao sincronizar, PDFs/DOC/XLS tentam
+  extração nativa primeiro (mais rápida); se um PDF não tiver texto
+  nativo (documento escaneado), ele **automaticamente** cai para o OCR,
+  sem precisar de ação manual. Imagens (PNG/JPEG) vão direto para o OCR.
+
+## Arquivos
 
 ```
-app/Models/User.php                          → substitui
-app/Models/AuditProcess.php                   → substitui
-app/Http/Controllers/AccountController.php    → NOVO
-app/Http/Controllers/AuditProcessController.php → substitui
-app/Http/Controllers/UserController.php       → substitui (fica em app/Http/Controllers/Admin/)
-app/Http/Middleware/ForcarTrocaSenha.php       → NOVO
-bootstrap/app.php                              → substitui
-routes/web.php                                 → substitui
-database/migrations/*.php                      → adiciona (2 arquivos novos)
-database/seeders/RolesAndPermissionsSeeder.php → substitui
-database/seeders/AdminUserSeeder.php           → substitui
-resources/views/layouts/app.blade.php          → substitui
-resources/views/account/editar.blade.php       → NOVO
-resources/views/processes/*.blade.php          → substitui (index, create, show) + NOVO (edit)
-resources/views/admin/users/edit.blade.php     → substitui
+config/ocr.php                                    → NOVO
+app/Services/Ocr/PdfToImageConverter.php          → NOVO
+app/Services/Ocr/TesseractRunner.php              → NOVO
+app/Jobs/OcrEvidenceJob.php                        → NOVO
+app/Jobs/SyncProcessEvidenceJob.php                → substitui
+app/Jobs/ExtractEvidenceTextJob.php                → substitui
+app/Http/Controllers/EvidenceController.php       → NOVO
+routes/web.php                                     → substitui (confira antes, como sempre)
+resources/views/processes/show.blade.php           → substitui
 ```
 
-Atenção ao `UserController.php`: neste pacote ele está na raiz por
-simplicidade de envio, mas o namespace do arquivo é `App\Http\Controllers\Admin`
-— ele deve ir para `app/Http/Controllers/Admin/UserController.php`, como já
-estava no seu projeto.
+**Atenção**: o `show.blade.php` usa as classes `.acao-btn` / `.acao-duplicar`
+que criamos no ajuste anterior (botões de ícone). Se por algum motivo
+vocês não aplicaram aquele pacote, o botão de reprocessar vai aparecer
+sem estilo (funciona, mas feio) — vale confirmar que o `layouts/app.blade.php`
+já tem aquelas classes.
 
-### 2. Rodar as migrations novas
+## 1. Instalar o Tesseract OCR
+
+### Windows
+
+1. Baixe o instalador em: https://github.com/UB-Mannheim/tesseract/wiki
+2. Durante a instalação, **marque o pacote de idioma Português** (na
+   tela de seleção de componentes, em "Additional language data").
+   Se esquecer, dá para baixar depois o arquivo `por.traineddata` em
+   https://github.com/tesseract-ocr/tessdata e colocar na pasta
+   `tessdata` da instalação (geralmente
+   `C:\Program Files\Tesseract-OCR\tessdata`).
+3. Anote o caminho do executável, normalmente:
+   ```
+   C:\Program Files\Tesseract-OCR\tesseract.exe
+   ```
+4. **Teste direto no terminal antes de testar pela aplicação** (evita
+   confundir bug de instalação com bug de código, como já aconteceu
+   antes com o certificado SSL e o Ghostscript):
+   ```bash
+   "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
+   ```
+
+### Linux (referência, caso o servidor final seja Linux)
 
 ```bash
-php artisan migrate
+sudo apt install tesseract-ocr tesseract-ocr-por
 ```
 
-Isso adiciona a coluna `deve_alterar_senha` em `users` e `descricao` em
-`audit_processes`, sem alterar nada que já existia.
+## 2. Instalar o Ghostscript
 
-### 3. Rodar o seeder de permissões novamente
+### Windows
+
+1. Baixe em: https://www.ghostscript.com/releases/gsdnld.html (versão
+   "AGPL", normal para uso interno)
+2. Instale normalmente. O executável de linha de comando (o que
+   interessa aqui, não o `gswin64.exe` da versão com interface gráfica)
+   fica em algo como:
+   ```
+   C:\Program Files\gs\gs10.03.0\bin\gswin64c.exe
+   ```
+   (o número da versão muda; **use o que termina em `c.exe`**, é a
+   versão "console" — sem essa letra "c" é a versão com janela, que
+   trava esperando interação).
+3. Teste direto no terminal:
+   ```bash
+   "C:\Program Files\gs\gs10.03.0\bin\gswin64c.exe" --version
+   ```
+
+### Linux (referência)
 
 ```bash
-php artisan db:seed --class=Database\\Seeders\\RolesAndPermissionsSeeder
+sudo apt install ghostscript
 ```
 
-Isso cria a nova permissão `concluir-processo` e reatribui as permissões
-de cada perfil (usa `firstOrCreate`/`syncPermissions`, então é seguro rodar
-de novo sem duplicar nada nem apagar usuários existentes).
+## 3. Instalar o pacote PHP do Tesseract
 
-### 4. Usuários já existentes
+```bash
+composer require thiagoalessio/tesseract_ocr
+```
 
-Se você já tinha usuários cadastrados antes deste ajuste, o admin
-provavelmente não está com `deve_alterar_senha = true` retroativamente —
-isso é esperado (a coluna nasce com `false` por padrão). Se quiser forçar a
-troca de senha de alguém já existente, basta abrir a edição do usuário e
-marcar "Forçar troca de senha no próximo login".
+(Não precisa de mais nada — o Ghostscript é chamado direto via
+`Symfony\Process`, que já vem com o Laravel.)
 
-## O que foi implementado, ponto a ponto
+## 4. Configurar o `.env`
 
-**1. Usuário altera a própria senha**
-Tela nova em `/minha-conta` (`AccountController::editar` /
-`atualizarSenha`), exige a senha atual antes de trocar. Link adicionado no
-cabeçalho (nome do usuário agora é clicável).
+```
+TESSERACT_BINARY="C:\Program Files\Tesseract-OCR\tesseract.exe"
+GHOSTSCRIPT_BINARY="C:\Program Files\gs\gs10.03.0\bin\gswin64c.exe"
+OCR_IDIOMA=por
+OCR_DPI=300
+```
 
-**2. Admin altera senha de outros e/ou força troca no próximo login**
-No formulário de edição de usuário (`admin/users/edit.blade.php`), dois
-campos novos e independentes:
-- "Nova senha" (opcional) — se preenchido, já troca a senha.
-- "Forçar troca de senha no próximo login" — marca a flag
-  `deve_alterar_senha`, mesmo sem definir uma nova senha agora.
+Ajuste os caminhos conforme onde cada programa foi instalado no seu
+servidor. Em Linux, geralmente basta:
+```
+TESSERACT_BINARY=tesseract
+GHOSTSCRIPT_BINARY=gs
+```
 
-Um middleware global (`ForcarTrocaSenha`, registrado em
-`bootstrap/app.php`) intercepta **qualquer** requisição de um usuário
-autenticado com essa flag ativa e redireciona para `/trocar-senha` — uma
-tela dedicada que não pede senha atual (o usuário pode não saber a senha
-temporária que o admin definiu, do ponto de vista de já estar logado via
-sessão). Usuários novos (`UserController::store`) já nascem com essa flag
-ativa.
+## 5. Copiar os arquivos e limpar cache
 
-**3. Admin vê todos os processos**
-A permissão `ver-todos-processos` (que o admin já tinha por ter todas as
-permissões) agora faz a listagem mostrar todos os processos **por
-padrão**, sem precisar de parâmetro na URL — antes era o contrário
-(precisava passar `?todos=1`). Quem tem essa permissão pode alternar para
-"ver só os meus" com um link na tela.
+```bash
+php artisan config:clear
+```
 
-**4. Descrição e responsáveis editáveis**
-Novo campo `descricao` no processo (migration + model + telas de criar e
-editar). Nova rota/tela `/processos/{id}/editar` que permite reatribuir
-completamente a lista de responsáveis. Autorização em
-`AuditProcess::podeSerEditadoPor()`: admin sempre pode; qualquer outro
-usuário só pode editar processos onde ele é um dos responsáveis
-atribuídos ("o seu").
+## 6. Reiniciar o worker de fila
 
-**5 e 6. Transições de status controladas por permissão**
-Centralizei a regra em `AuditProcess::statusDisponiveisPara()` e
-`AuditProcess::PERMISSAO_POR_STATUS`:
-- `devolvido` exige `revisar-processo`
-- `aprovado` exige `aprovar-processo`
-- `concluido` exige `concluir-processo` (permissão nova)
-- `reaberto` exige `reabrir-processo`
-- `em_analise`/`em_revisao` ficam livres para qualquer responsável
-  atribuído ao processo (ou admin)
+```bash
+php artisan queue:work --tries=1
+```
 
-Como o perfil `analista` não tem `aprovar-processo` nem
-`concluir-processo` (ver seeder), essas opções **não aparecem** no
-`<select>` da tela para ele (ponto 6 — "não deve nem ficar disponível") —
-e mesmo que alguém tentasse forçar via requisição direta, o controller
-revalida a mesma lista de permissões no servidor antes de aplicar a
-transição. Como o admin tem todas as permissões, ele sempre vê e pode
-usar qualquer status (ponto 5).
+## 7. Testar
 
-## Ponto em aberto para vocês decidirem
+1. Sincronize um processo que tenha pelo menos uma imagem (PNG/JPEG) ou
+   um PDF escaneado na pasta do Dropbox.
+2. Acompanhe o terminal do `queue:work` — deve aparecer o
+   `OcrEvidenceJob` rodando (para PDFs escaneados, primeiro roda o
+   `ExtractEvidenceTextJob`, que detecta a ausência de texto nativo e
+   dispara o OCR sozinho).
+3. Atualize a tela do processo — a evidência deve aparecer com status
+   "Concluído" e origem do texto "Ocr".
 
-Ficou definido que **auditor** pode aprovar e concluir. Não ficou claro
-se ele também deveria poder **devolver para reabertura** sem ser admin —
-deixei do jeito que já estava (auditor tem `reabrir-processo`), mas é só
-uma linha no seeder para mudar se vocês quiserem restringir isso só ao
-admin.
+Se der erro, a mensagem na coluna "Observação" da tabela de evidências
+já aponta a causa mais provável (Tesseract ou Ghostscript não encontrado,
+caminho errado, etc.) — corrija o `.env`, rode `config:clear`, reinicie o
+`queue:work`, e clique no botão 🔄 "Reprocessar" que aparece ao lado de
+evidências com erro (sem precisar ressincronizar o processo inteiro).
+
+## Sobre qualidade do OCR
+
+- 300 DPI é um bom equilíbrio para a maioria dos documentos escaneados.
+  Se a qualidade do texto reconhecido vier ruim (muitos erros de
+  caracteres), vale tentar aumentar para 400-600 no `OCR_DPI` — mas isso
+  deixa o processamento mais lento e os arquivos temporários maiores.
+- Documentos escaneados tortos, com baixa resolução original, ou com
+  fundo colorido/marca d'água tendem a dar OCR de qualidade inferior —
+  isso é uma limitação do OCR em si, não do código.
