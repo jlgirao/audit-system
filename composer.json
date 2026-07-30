@@ -8,7 +8,8 @@
         "spatie/laravel-permission": "^6.25",
         "smalot/pdfparser": "^2.12",
         "phpoffice/phpword": "^1.4",
-        "phpoffice/phpspreadsheet": "^5.9"
+        "phpoffice/phpspreadsheet": "^5.9",
+        "thiagoalessio/tesseract_ocr": "^2.13"
     },
     "require-dev": {
         "laravel/tinker": "^2.9",
