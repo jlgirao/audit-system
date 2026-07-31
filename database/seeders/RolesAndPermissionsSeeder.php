@@ -24,6 +24,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'aprovar-processo',
             'concluir-processo', // NOVO: separado de aprovar, ver ponto 6
             'reabrir-processo',
+            'ver-metricas-ia',
         ];
 
         foreach ($permissoes as $permissao) {
@@ -50,6 +51,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'aprovar-processo',
             'concluir-processo',
             'reabrir-processo',
+            'ver-metricas-ia', // auditor acompanha a qualidade das sugestões da IA
         ]);
 
         // Um usuário pode ter os dois perfis (analista + auditor) — as

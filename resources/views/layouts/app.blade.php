@@ -53,6 +53,9 @@
         @can('configurar-ia')
             <a href="{{ route('admin.ia.index') }}">IA</a>
         @endcan
+        @can('ver-metricas-ia')
+            <a href="{{ route('metricas.index') }}">Métricas</a>
+        @endcan
     </div>
     <div>
         @auth

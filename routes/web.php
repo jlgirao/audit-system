@@ -10,11 +10,14 @@ use App\Http\Controllers\AuditQuestionController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DropboxBrowseController;
 use App\Http\Controllers\EvidenceController;
+use App\Http\Controllers\MetricsController;
 use App\Http\Controllers\OutputFileController;
 use App\Http\Controllers\ProcessAnswerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('processes.index'));
+
+Route::middleware('auth')->get('/metricas', [MetricsController::class, 'index'])->name('metricas.index');
 
 // Autenticação
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
