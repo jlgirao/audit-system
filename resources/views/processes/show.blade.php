@@ -5,11 +5,11 @@
 @section('conteudo')
     @if ($resumoIa['em_processamento'])
         <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:10px 16px; margin-bottom:16px; font-size:14px; color:#3730a3;">
-            ⏳ <strong>Este processo tem tarefas em segundo plano ainda rodando</strong> — a página vai se
+            ⏳ <strong>Este projeto tem tarefas em segundo plano ainda rodando</strong> — a página vai se
             atualizar sozinha a cada 15 segundos até tudo terminar.
             <span style="font-size:12px; display:block; margin-top:4px; color:#4338ca;">
                 @if ($resumoIa['status_sincronizacao'] === 'na_fila')
-                    Sincronização com o Dropbox está na fila, aguardando a vez (pode demorar se houver outros processos na frente).
+                    Sincronização com o Dropbox está na fila, aguardando a vez (pode demorar se houver outros projetos na frente).
                 @elseif ($resumoIa['status_sincronizacao'] === 'sincronizando')
                     Sincronizando com o Dropbox agora.
                 @endif
@@ -41,15 +41,15 @@
     @endif
 
     @if ($podeEditar)
-        <a class="btn" href="{{ route('processes.edit', $processo) }}">Editar processo</a>
+        <a class="btn" href="{{ route('processes.edit', $processo) }}">Editar projeto</a>
     @endif
 
     @can('excluir-processo')
         <form method="POST" action="{{ route('processes.destroy', $processo) }}" style="display:inline-block;"
-            onsubmit="return confirm('Excluir este processo? Ele deixa de aparecer nas listagens, mas o registro é preservado para fins de auditoria.');">
+            onsubmit="return confirm('Excluir este projeto? Ele deixa de aparecer nas listagens, mas o registro é preservado para fins de auditoria.');">
             @csrf
             @method('DELETE')
-            <button type="submit" style="background:#991b1b;">Excluir processo</button>
+            <button type="submit" style="background:#991b1b;">Excluir projeto</button>
         </form>
     @endcan
 
@@ -96,7 +96,11 @@
         <tbody>
         @forelse ($processo->evidencias as $evidencia)
             <tr>
-                <td>{{ $evidencia->nome_arquivo }}</td>
+                <td>
+                    <a href="{{ $evidencia->linkDropbox() }}" target="_blank" rel="noopener noreferrer" title="Abrir no Dropbox">
+                        {{ $evidencia->nome_arquivo }}
+                    </a>
+                </td>
                 <td>{{ strtoupper($evidencia->tipo_arquivo) }}</td>
                 <td>
                     @if ($evidencia->status_processamento === 'erro')
@@ -127,8 +131,9 @@
                 </td>
                 <td style="font-size:12px; color:#666;">{{ $evidencia->erro_detalhe ?? '—' }}</td>
                 <td>
-                    @if ($podeEditar && in_array($evidencia->status_processamento, ['erro', 'pendente']))
-                        <form method="POST" action="{{ route('evidences.reprocessar', [$processo, $evidencia]) }}">
+                    @if ($podeEditar && in_array($evidencia->status_processamento, ['erro', 'pendente', 'processando']))
+                        <form method="POST" action="{{ route('evidences.reprocessar', [$processo, $evidencia]) }}"
+                            onsubmit="return {{ $evidencia->status_processamento === 'processando' ? "confirm('Essa evidência já está marcada como processando. Só reprocesse se tiver certeza de que travou de verdade (ex: nenhum job pendente na fila) — senão pode duplicar o processamento.')" : 'true' }};">
                             @csrf
                             <button type="submit" class="acao-btn acao-duplicar" title="Reprocessar">🔄</button>
                         </form>
@@ -206,7 +211,7 @@
             <button type="submit">Atualizar status</button>
         </form>
     @else
-        <p style="color:#666; font-size:13px;">Você não tem permissão para alterar o status deste processo.</p>
+        <p style="color:#666; font-size:13px;">Você não tem permissão para alterar o status deste projeto.</p>
     @endif
 
     <h3>Histórico de status</h3>

@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\AiCallLog;
 use App\Models\AiConfig;
+use App\Models\AuditProcess;
 use App\Models\EvidenceFile;
 use App\Services\Ollama\OllamaClient;
 use Illuminate\Bus\Queueable;
@@ -33,7 +35,13 @@ class GenerateEmbeddingJob implements ShouldQueue
             return;
         }
 
+        if (! AuditProcess::find($evidencia->process_id)) {
+            return;
+        }
+
         $evidencia->update(['status_ia' => 'processando']);
+
+        $inicio = microtime(true);
 
         try {
             // Modelos de embedding costumam ter um limite de contexto BEM
@@ -49,6 +57,15 @@ class GenerateEmbeddingJob implements ShouldQueue
 
             $evidencia->update(['embedding_vector' => $vetor]);
 
+            AiCallLog::create([
+                'process_id' => $evidencia->process_id,
+                'evidence_file_id' => $evidencia->id,
+                'tipo_chamada' => 'embedding_evidencia',
+                'sucesso' => true,
+                'duracao_ms' => (int) ((microtime(true) - $inicio) * 1000),
+                'criado_em' => now(),
+            ]);
+
             // status_ia continua "processando" — só vira "concluido" no
             // final do MatchEvidenceToQuestionsJob, que é disparado a seguir.
             MatchEvidenceToQuestionsJob::dispatch($evidencia->id);
@@ -58,7 +75,27 @@ class GenerateEmbeddingJob implements ShouldQueue
             // adicional (IA) que pode ser tentada de novo depois que a
             // configuração do Ollama for corrigida.
             $evidencia->update(['status_ia' => 'erro']);
+
+            AiCallLog::create([
+                'process_id' => $evidencia->process_id,
+                'evidence_file_id' => $evidencia->id,
+                'tipo_chamada' => 'embedding_evidencia',
+                'sucesso' => false,
+                'duracao_ms' => (int) ((microtime(true) - $inicio) * 1000),
+                'erro_mensagem' => $e->getMessage(),
+                'criado_em' => now(),
+            ]);
+
             Log::warning("Falha ao gerar embedding da evidência {$evidencia->id}: ".$e->getMessage());
+        }
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $evidencia = EvidenceFile::find($this->evidenceFileId);
+
+        if ($evidencia && $evidencia->status_ia === 'processando') {
+            $evidencia->update(['status_ia' => 'erro']);
         }
     }
 }

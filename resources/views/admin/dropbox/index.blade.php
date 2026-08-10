@@ -12,7 +12,7 @@
                 em {{ $config->conectado_em->format('d/m/Y H:i') }}
             @endif
         </p>
-        <form method="POST" action="{{ route('admin.dropbox.desconectar') }}" onsubmit="return confirm('Desconectar o Dropbox? A sincronização de todos os processos vai parar até reconectar.');">
+        <form method="POST" action="{{ route('admin.dropbox.desconectar') }}" onsubmit="return confirm('Desconectar o Dropbox? A sincronização de todos os projetos vai parar até reconectar.');">
             @csrf
             @method('DELETE')
             <button type="submit" style="background:#991b1b;">Desconectar</button>

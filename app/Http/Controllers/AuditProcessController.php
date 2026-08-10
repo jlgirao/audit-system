@@ -7,6 +7,7 @@ use App\Jobs\MatchEvidenceToQuestionsJob;
 use App\Jobs\SyncProcessEvidenceJob;
 use App\Models\AuditProcess;
 use App\Models\User;
+use App\Services\ExcelExporter;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 
@@ -29,8 +30,9 @@ class AuditProcessController extends Controller implements HasMiddleware
     {
         $usuario = $request->user();
         $podeVerTodos = $usuario->can('ver-todos-processos');
+        $mostrandoTodos = $podeVerTodos && ! $request->boolean('meus');
 
-        $query = AuditProcess::query()
+        $query = $this->queryFiltrada($request)
             ->with('responsaveis')
             ->withCount([
                 'evidencias as evidencias_pendentes_count' => fn ($q) => $q->whereIn('status_processamento', ['pendente', 'processando']),
@@ -38,7 +40,53 @@ class AuditProcessController extends Controller implements HasMiddleware
                 'arquivosSaida as excel_processando_count' => fn ($q) => $q->where('status', 'processando'),
             ]);
 
+        $perPage = in_array((int) $request->input('per_page'), [10, 20, 50, 100], true)
+            ? (int) $request->input('per_page')
+            : 20;
+
+        $processos = $query->paginate($perPage)->withQueryString();
+
+        return view('processes.index', [
+            'processos' => $processos,
+            'podeVerTodos' => $podeVerTodos,
+            'mostrandoTodos' => $mostrandoTodos,
+        ]);
+    }
+
+    /**
+     * Exporta para Excel exatamente o resultado do filtro/busca/ordenação
+     * ativos na tela (mesma query do index(), só sem paginar).
+     */
+    public function exportar(Request $request)
+    {
+        $processos = $this->queryFiltrada($request)->with('responsaveis')->get();
+
+        $cabecalhos = ['ID', 'Nome', 'Responsáveis', 'Status', 'Atualizado em'];
+
+        $linhas = $processos->map(fn (AuditProcess $processo) => [
+            substr($processo->uuid, 0, 8),
+            $processo->nome,
+            $processo->responsaveis->pluck('nome')->join(', '),
+            ucfirst(str_replace('_', ' ', $processo->status)),
+            $processo->updated_at->format('d/m/Y H:i'),
+        ]);
+
+        return ExcelExporter::gerar($cabecalhos, $linhas, 'projetos.xlsx');
+    }
+
+    /**
+     * Monta a query com visibilidade (meus/todos), busca, filtro de status
+     * e ordenação — usada tanto pela listagem quanto pela exportação, para
+     * garantir que a exportação sempre reflita exatamente o que está
+     * filtrado na tela.
+     */
+    private function queryFiltrada(Request $request)
+    {
+        $usuario = $request->user();
+        $podeVerTodos = $usuario->can('ver-todos-processos');
         $mostrandoTodos = $podeVerTodos && ! $request->boolean('meus');
+
+        $query = AuditProcess::query();
 
         if (! $mostrandoTodos) {
             $query->whereHas('responsaveis', fn ($q) => $q->where('users.id', $usuario->id));
@@ -55,13 +103,13 @@ class AuditProcessController extends Controller implements HasMiddleware
             });
         }
 
-        $processos = $query->orderByDesc('updated_at')->paginate(15)->withQueryString();
+        // Ordenação clicável pelo cabeçalho — whitelist de colunas por
+        // segurança (nunca aceitar o nome da coluna direto da URL sem checar).
+        $colunasOrdenaveis = ['nome', 'status', 'updated_at'];
+        $sort = in_array($request->input('sort'), $colunasOrdenaveis, true) ? $request->input('sort') : 'updated_at';
+        $direction = $request->input('direction') === 'asc' ? 'asc' : 'desc';
 
-        return view('processes.index', [
-            'processos' => $processos,
-            'podeVerTodos' => $podeVerTodos,
-            'mostrandoTodos' => $mostrandoTodos,
-        ]);
+        return $query->orderBy($sort, $direction);
     }
 
     public function create()
@@ -100,9 +148,9 @@ class AuditProcessController extends Controller implements HasMiddleware
             ]);
         }
 
-        $processo->transicionarStatus('criado', $request->user()->id, 'Processo criado.');
+        $processo->transicionarStatus('criado', $request->user()->id, 'Projeto criado.');
 
-        return redirect()->route('processes.show', $processo)->with('status', 'Processo criado com sucesso.');
+        return redirect()->route('processes.show', $processo)->with('status', 'Projeto criado com sucesso.');
     }
 
     public function show(AuditProcess $process)
@@ -193,7 +241,7 @@ class AuditProcessController extends Controller implements HasMiddleware
             ]);
         }
 
-        return redirect()->route('processes.show', $process)->with('status', 'Processo atualizado com sucesso.');
+        return redirect()->route('processes.show', $process)->with('status', 'Projeto atualizado com sucesso.');
     }
 
     /**
@@ -256,7 +304,7 @@ class AuditProcessController extends Controller implements HasMiddleware
 
         if (! in_array($dados['novo_status'], $permitidos, true)) {
             return back()->withErrors([
-                'novo_status' => 'Você não tem permissão para mover este processo para este status.',
+                'novo_status' => 'Você não tem permissão para mover este projeto para este status.',
             ]);
         }
 
@@ -280,6 +328,41 @@ class AuditProcessController extends Controller implements HasMiddleware
 
         $process->delete();
 
-        return redirect()->route('processes.index')->with('status', 'Processo excluído com sucesso.');
+        return redirect()->route('processes.index')->with('status', 'Projeto excluído com sucesso.');
+    }
+
+    /**
+     * Lista os processos excluídos (soft delete) — mesma permissão de
+     * quem pode excluir, já que é a mesma responsabilidade.
+     */
+    public function excluidos(Request $request)
+    {
+        abort_unless($request->user()->can('excluir-processo'), 403);
+
+        $perPage = in_array((int) $request->input('per_page'), [10, 20, 50, 100], true)
+            ? (int) $request->input('per_page')
+            : 20;
+
+        $processos = AuditProcess::onlyTrashed()
+            ->with('responsaveis')
+            ->orderByDesc('deleted_at')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view('processes.excluidos', compact('processos'));
+    }
+
+    /**
+     * Restaura um processo excluído. A rota usa ->withTrashed() para o
+     * model binding conseguir encontrar o registro mesmo estando com
+     * soft delete (por padrão, o binding automático não encontraria).
+     */
+    public function restaurar(Request $request, AuditProcess $process)
+    {
+        abort_unless($request->user()->can('excluir-processo'), 403);
+
+        $process->restore();
+
+        return redirect()->route('processes.show', $process)->with('status', 'Projeto restaurado com sucesso.');
     }
 }

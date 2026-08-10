@@ -158,4 +158,13 @@ class SyncProcessEvidenceJob implements ShouldQueue
 
         return $houveMudanca;
     }
+
+    public function failed(?Throwable $exception): void
+    {
+        $process = AuditProcess::find($this->processId);
+
+        if ($process && $process->status_sincronizacao !== 'concluido') {
+            $process->update(['status_sincronizacao' => 'erro']);
+        }
+    }
 }

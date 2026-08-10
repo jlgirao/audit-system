@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\AuditProcess;
 use App\Models\EvidenceFile;
 use App\Services\Dropbox\DropboxClient;
 use App\Services\Ocr\PdfToImageConverter;
@@ -35,6 +36,10 @@ class OcrEvidenceJob implements ShouldQueue
         $evidencia = EvidenceFile::find($this->evidenceFileId);
 
         if (! $evidencia) {
+            return;
+        }
+
+        if (! AuditProcess::find($evidencia->process_id)) {
             return;
         }
 
@@ -106,5 +111,17 @@ class OcrEvidenceJob implements ShouldQueue
         }
 
         @rmdir($diretorio);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $evidencia = EvidenceFile::find($this->evidenceFileId);
+
+        if ($evidencia && $evidencia->status_processamento === 'processando') {
+            $evidencia->update([
+                'status_processamento' => 'erro',
+                'erro_detalhe' => $exception?->getMessage() ?? 'Job de OCR falhou sem mensagem de erro específica.',
+            ]);
+        }
     }
 }

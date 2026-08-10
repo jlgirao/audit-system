@@ -19,11 +19,47 @@ class ProcessAnswerController extends Controller implements HasMiddleware
         ];
     }
 
-    public function edit(AuditProcess $process)
+    public function edit(Request $request, AuditProcess $process)
     {
-        abort_unless($process->podeSerEditadoPor(request()->user()), 403);
+        abort_unless($process->podeSerEditadoPor($request->user()), 403);
 
-        $perguntas = AuditQuestion::where('ativo', true)->orderBy('ordem')->get();
+        $abasDisponiveis = AuditQuestion::where('ativo', true)
+            ->select('aba_excel')
+            ->distinct()
+            ->orderBy('aba_excel')
+            ->pluck('aba_excel');
+
+        $queryPerguntas = AuditQuestion::where('ativo', true);
+
+        if ($aba = $request->input('aba')) {
+            $queryPerguntas->where('aba_excel', $aba);
+        }
+
+        $filtro = $request->input('filtro');
+
+        if ($filtro === 'com_sugestao') {
+            $idsComSugestao = QuestionEvidenceMatch::where('process_id', $process->id)
+                ->where('origem', 'ia_sugerido')
+                ->pluck('question_id')
+                ->unique();
+
+            $queryPerguntas->whereIn('id', $idsComSugestao);
+        } elseif ($filtro === 'sem_resposta') {
+            $idsComResposta = $process->respostas()->pluck('question_id');
+
+            $queryPerguntas->whereNotIn('id', $idsComResposta);
+        }
+
+        $perPage = in_array((int) $request->input('per_page'), [5, 10, 20, 50], true)
+            ? (int) $request->input('per_page')
+            : 10;
+
+        $perguntas = $queryPerguntas->orderBy('ordem')->paginate($perPage)->withQueryString();
+
+        // Respostas/matches continuam buscados para o processo inteiro (não
+        // só a página atual) — a consulta é barata (por process_id, com
+        // índice) e evita complicar a lógica de "usar sugestão da IA" para
+        // perguntas que não estão na página exibida agora.
         $respostas = $process->respostas()->get()->keyBy('question_id');
         $evidencias = $process->evidencias()->orderBy('nome_arquivo')->get();
 
@@ -42,6 +78,7 @@ class ProcessAnswerController extends Controller implements HasMiddleware
         return view('processes.respostas', [
             'processo' => $process,
             'perguntas' => $perguntas,
+            'abasDisponiveis' => $abasDisponiveis,
             'respostas' => $respostas,
             'evidencias' => $evidencias,
             'matchesConfirmados' => $matchesConfirmados,
@@ -161,7 +198,10 @@ class ProcessAnswerController extends Controller implements HasMiddleware
             $process->transicionarStatus('em_analise', $request->user()->id, 'Transição automática: primeira resposta salva.');
         }
 
-        return redirect()->route('processes.show', $process)->with('status', 'Respostas salvas com sucesso.');
+        return redirect()->route('processes.respostas.edit', array_merge(
+            ['process' => $process->id],
+            $request->only(['aba', 'filtro', 'page', 'per_page'])
+        ))->with('status', 'Respostas salvas com sucesso.');
     }
 
     /**
@@ -208,7 +248,9 @@ class ProcessAnswerController extends Controller implements HasMiddleware
             $process->transicionarStatus('em_analise', $request->user()->id, 'Transição automática: primeira resposta salva.');
         }
 
-        return redirect()->route('processes.respostas.edit', $process)
-            ->with('status', "{$totalAplicado} pergunta(s) sem evidência definida(s) como \"Não\" automaticamente. Revise antes de gerar o Excel.");
+        return redirect()->route('processes.respostas.edit', array_merge(
+            ['process' => $process->id],
+            $request->only(['aba', 'filtro', 'page', 'per_page'])
+        ))->with('status', "{$totalAplicado} pergunta(s) sem evidência definida(s) como \"Não\" automaticamente. Revise antes de gerar o Excel.");
     }
 }

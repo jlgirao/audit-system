@@ -83,6 +83,11 @@ class AuditProcess extends Model
         return $this->hasMany(OutputFile::class, 'process_id')->orderByDesc('versao');
     }
 
+    public function chamadasIa()
+    {
+        return $this->hasMany(AiCallLog::class, 'process_id');
+    }
+
     /**
      * Ponto 4: "cada user pode editar o seu" — considera-se "seu" qualquer
      * processo onde o usuário está atribuído como responsável (principal

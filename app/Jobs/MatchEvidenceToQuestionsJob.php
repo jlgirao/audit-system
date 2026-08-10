@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\AiCallLog;
 use App\Models\AiConfig;
+use App\Models\AuditProcess;
 use App\Models\AuditQuestion;
 use App\Models\EvidenceFile;
 use App\Models\QuestionEvidenceMatch;
@@ -38,6 +40,10 @@ class MatchEvidenceToQuestionsJob implements ShouldQueue
             return;
         }
 
+        if (! AuditProcess::find($evidencia->process_id)) {
+            return;
+        }
+
         // Marca "processando" aqui também (não só no GenerateEmbeddingJob),
         // porque este job pode ser disparado direto quando o embedding já
         // existe (ex: botão "Rodar matching por IA" numa evidência já
@@ -45,7 +51,8 @@ class MatchEvidenceToQuestionsJob implements ShouldQueue
         $evidencia->update(['status_ia' => 'processando']);
 
         $limiar = (float) AiConfig::get('limiar_similaridade_minimo', '0.55');
-        $maxCandidatos = (int) AiConfig::get('max_candidatos_por_evidencia', '3');
+        $maxPorAba = (int) AiConfig::get('max_candidatos_por_aba', '2');
+        $maxTotal = (int) AiConfig::get('max_candidatos_por_evidencia', '20');
 
         $perguntas = AuditQuestion::where('ativo', true)->get();
         $candidatos = [];
@@ -57,10 +64,33 @@ class MatchEvidenceToQuestionsJob implements ShouldQueue
             // Embedding da pergunta é gerado uma vez e cacheado — as
             // próximas evidências reaproveitam sem chamar o Ollama de novo.
             if (empty($embeddingPergunta)) {
+                $inicioEmbedding = microtime(true);
+
                 try {
                     $embeddingPergunta = $ollama->gerarEmbedding($pergunta->texto_pergunta, 'query');
                     $pergunta->update(['embedding_vector' => $embeddingPergunta]);
+
+                    AiCallLog::create([
+                        'process_id' => $evidencia->process_id,
+                        'evidence_file_id' => $evidencia->id,
+                        'question_id' => $pergunta->id,
+                        'tipo_chamada' => 'embedding_pergunta',
+                        'sucesso' => true,
+                        'duracao_ms' => (int) ((microtime(true) - $inicioEmbedding) * 1000),
+                        'criado_em' => now(),
+                    ]);
                 } catch (Throwable $e) {
+                    AiCallLog::create([
+                        'process_id' => $evidencia->process_id,
+                        'evidence_file_id' => $evidencia->id,
+                        'question_id' => $pergunta->id,
+                        'tipo_chamada' => 'embedding_pergunta',
+                        'sucesso' => false,
+                        'duracao_ms' => (int) ((microtime(true) - $inicioEmbedding) * 1000),
+                        'erro_mensagem' => $e->getMessage(),
+                        'criado_em' => now(),
+                    ]);
+
                     Log::warning("Falha ao gerar embedding da pergunta {$pergunta->id}: ".$e->getMessage());
 
                     continue;
@@ -101,13 +131,55 @@ class MatchEvidenceToQuestionsJob implements ShouldQueue
             return;
         }
 
-        $candidatos = array_slice($candidatos, 0, $maxCandidatos);
+        // Seleção por ABA, não mais top-N global: agrupa os candidatos (já
+        // filtrados pelo limiar) por "Aba no Excel" da pergunta, pega as
+        // $maxPorAba melhores DE CADA aba, e só depois aplica um teto de
+        // segurança total ($maxTotal) sobre o conjunto combinado. Isso
+        // evita que uma aba com perguntas mais "genéricas" (que tendem a
+        // ter similaridade moderada com qualquer documento) monopolize
+        // todas as vagas e deixe perguntas de outras abas — mesmo com
+        // similaridade real e válida — de fora da avaliação do LLM.
+        $candidatosPorAba = collect($candidatos)->groupBy(fn ($c) => $c['pergunta']->aba_excel);
 
-        foreach ($candidatos as $candidato) {
+        $candidatosSelecionados = $candidatosPorAba
+            ->flatMap(fn ($grupo) => collect($grupo)->sortByDesc('similaridade')->take($maxPorAba)->values())
+            ->sortByDesc('similaridade')
+            ->take($maxTotal)
+            ->values();
+
+        if ($candidatosSelecionados->isEmpty()) {
+            $evidencia->update(['status_ia' => 'concluido']);
+
+            return;
+        }
+
+        $resumoSelecao = $candidatosSelecionados
+            ->map(fn ($c) => sprintf('%s(%s)=%.3f', $c['pergunta']->codigo, $c['pergunta']->aba_excel, $c['similaridade']))
+            ->implode(', ');
+
+        Log::info(sprintf(
+            'Matching: candidatos selecionados para a evidência %d (%s) — %s (até %d por aba, %d no total)',
+            $evidencia->id,
+            $evidencia->nome_arquivo,
+            $resumoSelecao,
+            $maxPorAba,
+            $maxTotal
+        ));
+
+        foreach ($candidatosSelecionados as $candidato) {
+            // Confere de novo a cada chamada (não só uma vez no início) —
+            // como cada chamada de LLM pode levar bastante tempo, o processo
+            // pode ter sido excluído no meio da execução deste job.
+            if (! AuditProcess::find($evidencia->process_id)) {
+                return;
+            }
+
             $this->confirmarComLlm($evidencia, $candidato['pergunta'], $candidato['similaridade'], $ollama);
         }
 
-        $evidencia->update(['status_ia' => 'concluido']);
+        if (AuditProcess::find($evidencia->process_id)) {
+            $evidencia->update(['status_ia' => 'concluido']);
+        }
     }
 
     private function confirmarComLlm(EvidenceFile $evidencia, AuditQuestion $pergunta, float $similaridade, OllamaClient $ollama): void
@@ -125,9 +197,32 @@ class MatchEvidenceToQuestionsJob implements ShouldQueue
 
         $prompt = $this->montarPrompt($pergunta, $evidencia);
 
+        $inicio = microtime(true);
+
         try {
             $dadosBrutos = $ollama->gerarRespostaJson($prompt);
+
+            AiCallLog::create([
+                'process_id' => $evidencia->process_id,
+                'evidence_file_id' => $evidencia->id,
+                'question_id' => $pergunta->id,
+                'tipo_chamada' => 'matching',
+                'sucesso' => true,
+                'duracao_ms' => (int) ((microtime(true) - $inicio) * 1000),
+                'criado_em' => now(),
+            ]);
         } catch (Throwable $e) {
+            AiCallLog::create([
+                'process_id' => $evidencia->process_id,
+                'evidence_file_id' => $evidencia->id,
+                'question_id' => $pergunta->id,
+                'tipo_chamada' => 'matching',
+                'sucesso' => false,
+                'duracao_ms' => (int) ((microtime(true) - $inicio) * 1000),
+                'erro_mensagem' => $e->getMessage(),
+                'criado_em' => now(),
+            ]);
+
             Log::warning("Falha ao confirmar match (pergunta {$pergunta->id}, evidência {$evidencia->id}): ".$e->getMessage());
 
             return;
@@ -229,9 +324,13 @@ class MatchEvidenceToQuestionsJob implements ShouldQueue
 
         $promptBase = AiConfig::get('prompt_base_matching', $this->promptPadrao());
 
+        $blocoContexto = trim((string) $pergunta->contexto_adicional) !== ''
+            ? "Contexto adicional para interpretar esta pergunta (informado pelo auditor): {$pergunta->contexto_adicional}\n"
+            : '';
+
         return str_replace(
-            ['{pergunta}', '{evidencia}'],
-            [$pergunta->texto_pergunta, $textoEvidencia],
+            ['{pergunta}', '{evidencia}', '{contexto}'],
+            [$pergunta->texto_pergunta, $textoEvidencia, $blocoContexto],
             $promptBase
         );
     }
@@ -243,7 +342,7 @@ Você é um assistente de auditoria. Analise se o texto de evidência abaixo
 responde à pergunta de auditoria informada.
 
 Pergunta de auditoria: {pergunta}
-
+{contexto}
 Texto da evidência:
 """
 {evidencia}
@@ -260,5 +359,14 @@ Responda APENAS em JSON válido, neste formato exato:
 Se a evidência claramente não tem relação com a pergunta, responda
 "responde_a_pergunta": false.
 PROMPT;
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $evidencia = EvidenceFile::find($this->evidenceFileId);
+
+        if ($evidencia && $evidencia->status_ia === 'processando') {
+            $evidencia->update(['status_ia' => 'erro']);
+        }
     }
 }

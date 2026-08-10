@@ -41,4 +41,22 @@ class EvidenceFile extends Model
     {
         return $this->hasMany(QuestionEvidenceMatch::class, 'evidence_file_id');
     }
+
+    /**
+     * Monta um link que abre o arquivo direto na visualização do Dropbox
+     * (funciona no navegador para quem já está logado numa conta com
+     * acesso à pasta) — não usa a API do Dropbox nem precisa de nenhuma
+     * permissão extra no app, só reaproveita o caminho já sincronizado.
+     */
+    public function linkDropbox(): string
+    {
+        $diretorio = str_contains($this->caminho_dropbox, '/')
+            ? substr($this->caminho_dropbox, 0, strrpos($this->caminho_dropbox, '/'))
+            : '';
+
+        $segmentos = array_filter(explode('/', $diretorio), fn ($s) => $s !== '');
+        $diretorioCodificado = '/'.implode('/', array_map('rawurlencode', $segmentos));
+
+        return 'https://www.dropbox.com/home'.$diretorioCodificado.'?preview='.rawurlencode($this->nome_arquivo);
+    }
 }

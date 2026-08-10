@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditQuestion;
+use App\Services\ExcelExporter;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 
@@ -16,11 +17,79 @@ class AuditQuestionController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $perguntas = AuditQuestion::orderBy('ordem')->paginate(20);
+        $perPage = in_array((int) $request->input('per_page'), [10, 20, 50, 100], true)
+            ? (int) $request->input('per_page')
+            : 20;
 
-        return view('questions.index', compact('perguntas'));
+        $perguntas = $this->queryFiltrada($request)->paginate($perPage)->withQueryString();
+
+        $abasDisponiveis = AuditQuestion::query()
+            ->select('aba_excel')
+            ->distinct()
+            ->orderBy('aba_excel')
+            ->pluck('aba_excel');
+
+        return view('questions.index', compact('perguntas', 'abasDisponiveis'));
+    }
+
+    /**
+     * Exporta para Excel exatamente o resultado do filtro/busca/ordenação
+     * ativos na tela.
+     */
+    public function exportar(Request $request)
+    {
+        $perguntas = $this->queryFiltrada($request)->get();
+
+        $cabecalhos = [
+            'Código', 'Pergunta', 'Contexto Adicional', 'Categoria', 'Aba Excel', 'Linha Excel',
+            'Col. Resposta', 'Col. Observações', 'Col. Evidência', 'Col. Parecer',
+            'Ordem', 'Ativo',
+        ];
+
+        $linhas = $perguntas->map(fn (AuditQuestion $pergunta) => [
+            $pergunta->codigo,
+            $pergunta->texto_pergunta,
+            $pergunta->contexto_adicional,
+            $pergunta->categoria,
+            $pergunta->aba_excel,
+            $pergunta->linha_excel,
+            $pergunta->coluna_ha_evidencia,
+            $pergunta->coluna_observacoes,
+            $pergunta->coluna_evidencia,
+            $pergunta->coluna_parecer,
+            $pergunta->ordem,
+            $pergunta->ativo ? 'Sim' : 'Não',
+        ]);
+
+        return ExcelExporter::gerar($cabecalhos, $linhas, 'perguntas.xlsx');
+    }
+
+    /**
+     * Monta a query com busca (código/texto), filtro por aba e ordenação —
+     * usada tanto pela listagem quanto pela exportação.
+     */
+    private function queryFiltrada(Request $request)
+    {
+        $query = AuditQuestion::query();
+
+        if ($busca = $request->input('busca')) {
+            $query->where(function ($q) use ($busca) {
+                $q->where('codigo', 'like', "%{$busca}%")
+                    ->orWhere('texto_pergunta', 'like', "%{$busca}%");
+            });
+        }
+
+        if ($aba = $request->input('aba')) {
+            $query->where('aba_excel', $aba);
+        }
+
+        $colunasOrdenaveis = ['codigo', 'texto_pergunta', 'aba_excel', 'linha_excel', 'ordem'];
+        $sort = in_array($request->input('sort'), $colunasOrdenaveis, true) ? $request->input('sort') : 'ordem';
+        $direction = $request->input('direction') === 'desc' ? 'desc' : 'asc';
+
+        return $query->orderBy($sort, $direction);
     }
 
     public function create()
@@ -90,6 +159,7 @@ class AuditQuestionController extends Controller implements HasMiddleware
         return $request->validate([
             'codigo' => ['required', 'string', 'max:30', 'unique:audit_questions,codigo,'.$ignorarId],
             'texto_pergunta' => ['required', 'string'],
+            'contexto_adicional' => ['nullable', 'string'],
             'categoria' => ['nullable', 'string', 'max:100'],
             'aba_excel' => ['required', 'string', 'max:100'],
             'linha_excel' => ['required', 'integer', 'min:1'],

@@ -36,8 +36,12 @@ Route::middleware('auth')->group(function () {
 // Processos de auditoria
 Route::middleware('auth')->group(function () {
     Route::get('/processos', [AuditProcessController::class, 'index'])->name('processes.index');
+    Route::get('/processos/exportar', [AuditProcessController::class, 'exportar'])->name('processes.exportar');
+    Route::get('/processos/excluidos', [AuditProcessController::class, 'excluidos'])->name('processes.excluidos');
     Route::get('/processos/novo', [AuditProcessController::class, 'create'])->name('processes.create');
     Route::post('/processos', [AuditProcessController::class, 'store'])->name('processes.store');
+    Route::post('/processos/{process}/restaurar', [AuditProcessController::class, 'restaurar'])
+        ->name('processes.restaurar')->withTrashed();
     Route::get('/processos/{process}', [AuditProcessController::class, 'show'])->name('processes.show');
     Route::get('/processos/{process}/editar', [AuditProcessController::class, 'edit'])->name('processes.edit');
     Route::put('/processos/{process}', [AuditProcessController::class, 'update'])->name('processes.update');
@@ -61,6 +65,7 @@ Route::middleware('auth')->group(function () {
 // Perguntas de auditoria (admin)
 Route::middleware('auth')->prefix('perguntas')->name('questions.')->group(function () {
     Route::get('/', [AuditQuestionController::class, 'index'])->name('index');
+    Route::get('/exportar', [AuditQuestionController::class, 'exportar'])->name('exportar');
     Route::get('/nova', [AuditQuestionController::class, 'create'])->name('create');
     Route::post('/', [AuditQuestionController::class, 'store'])->name('store');
     Route::get('/{question}/editar', [AuditQuestionController::class, 'edit'])->name('edit');
@@ -92,6 +97,7 @@ Route::middleware('auth')->prefix('admin/template')->name('admin.template.')->gr
 // Administração de usuários
 Route::middleware('auth')->prefix('admin/usuarios')->name('admin.users.')->group(function () {
     Route::get('/', [UserController::class, 'index'])->name('index');
+    Route::get('/exportar', [UserController::class, 'exportar'])->name('exportar');
     Route::get('/novo', [UserController::class, 'create'])->name('create');
     Route::post('/', [UserController::class, 'store'])->name('store');
     Route::get('/{user}/editar', [UserController::class, 'edit'])->name('edit');

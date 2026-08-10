@@ -24,6 +24,9 @@
             </label>
         @endforeach
 
-        <button type="submit">Criar usuário</button>
+        <div style="display:flex; gap:8px;">
+            <button type="submit">Criar usuário</button>
+            <a href="{{ route('admin.users.index') }}" class="btn" style="background:#57534e;">Cancelar</a>
+        </div>
     </form>
 @endsection

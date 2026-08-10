@@ -4,6 +4,14 @@
 <label>Texto da pergunta</label>
 <textarea name="texto_pergunta" rows="2" required>{{ old('texto_pergunta', $pergunta->texto_pergunta ?? '') }}</textarea>
 
+<label>Contexto adicional para a IA (opcional)</label>
+<textarea name="contexto_adicional" rows="3" placeholder="Ex: Procure o valor no contrato assinado. Considere a resposta da pergunta H-007. Consulte o Decreto-Lei nº 84/2017. BF = Beneficiário Final.">{{ old('contexto_adicional', $pergunta->contexto_adicional ?? '') }}</textarea>
+<p style="font-size:12px; color:#666; margin-top:2px;">
+    Orientações extras que a IA deve considerar ao avaliar essa pergunta — onde procurar a
+    resposta, referências a outras perguntas, leis a consultar, significado de siglas, etc.
+    Isso entra no prompt enviado ao modelo, não afeta a comparação inicial por similaridade.
+</p>
+
 <label>Categoria</label>
 <input type="text" name="categoria" value="{{ old('categoria', $pergunta->categoria ?? '') }}">
 
@@ -32,4 +40,7 @@
 <label>Ordem de exibição</label>
 <input type="number" name="ordem" value="{{ old('ordem', $pergunta->ordem ?? 0) }}">
 
-<button type="submit">Salvar</button>
+<div style="display:flex; gap:8px;">
+    <button type="submit">Salvar</button>
+    <a href="{{ route('questions.index') }}" class="btn" style="background:#57534e;">Cancelar</a>
+</div>

@@ -1,14 +1,14 @@
 @extends('layouts.app')
 
-@section('titulo', 'Novo processo')
+@section('titulo', 'Novo projeto')
 
 @section('conteudo')
-    <h2>Novo processo de auditoria</h2>
+    <h2>Novo projeto de auditoria</h2>
 
     <form method="POST" action="{{ route('processes.store') }}">
         @csrf
 
-        <label>Nome do processo</label>
+        <label>Nome do projeto</label>
         <input type="text" name="nome" value="{{ old('nome') }}" required>
 
         <label>Descrição</label>
@@ -30,6 +30,9 @@
             @endforeach
         </select>
 
-        <button type="submit">Criar processo</button>
+        <div style="display:flex; gap:8px;">
+            <button type="submit">Criar projeto</button>
+            <a href="{{ route('processes.index') }}" class="btn" style="background:#57534e;">Cancelar</a>
+        </div>
     </form>
 @endsection

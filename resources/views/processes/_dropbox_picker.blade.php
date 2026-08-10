@@ -4,7 +4,7 @@
 <div style="display:flex; gap:8px;">
     <input type="text" name="dropbox_folder_path" id="dropbox_folder_path"
         value="{{ old('dropbox_folder_path', $valorAtual ?? '') }}"
-        placeholder="/Auditorias/Processo_2026_001" required style="flex:1; margin-top:0;">
+        placeholder="/Auditorias/Projeto_2026_001" required style="flex:1; margin-top:0;">
     <button type="button" onclick="dropboxSeletorAbrir()" style="margin-top:0; white-space:nowrap;">
         Escolher no Dropbox
     </button>

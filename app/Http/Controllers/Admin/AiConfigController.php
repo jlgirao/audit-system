@@ -22,7 +22,8 @@ class AiConfigController extends Controller implements HasMiddleware
         'modelo_embedding' => 'nomic-embed-text',
         'modelo_matching' => 'qwen2.5:14b',
         'limiar_similaridade_minimo' => '0.55',
-        'max_candidatos_por_evidencia' => '3',
+        'max_candidatos_por_aba' => '2',
+        'max_candidatos_por_evidencia' => '20',
         'limite_caracteres_embedding' => '2000',
     ];
 
@@ -46,7 +47,8 @@ class AiConfigController extends Controller implements HasMiddleware
             'modelo_embedding' => ['required', 'string', 'max:100'],
             'modelo_matching' => ['required', 'string', 'max:100'],
             'limiar_similaridade_minimo' => ['required', 'numeric', 'min:0', 'max:1'],
-            'max_candidatos_por_evidencia' => ['required', 'integer', 'min:1', 'max:10'],
+            'max_candidatos_por_aba' => ['required', 'integer', 'min:1', 'max:10'],
+            'max_candidatos_por_evidencia' => ['required', 'integer', 'min:1', 'max:100'],
             'limite_caracteres_embedding' => ['required', 'integer', 'min:200', 'max:20000'],
             'prompt_base_matching' => ['required', 'string'],
         ]);

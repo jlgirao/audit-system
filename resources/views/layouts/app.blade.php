@@ -39,7 +39,7 @@
 <body>
 <header>
     <div>
-        <a href="{{ route('processes.index') }}">Processos</a>
+        <a href="{{ route('processes.index') }}">Projetos</a>
         @can('gerenciar-perguntas')
             <a href="{{ route('questions.index') }}">Perguntas</a>
             <a href="{{ route('admin.template.index') }}">Template Excel</a>

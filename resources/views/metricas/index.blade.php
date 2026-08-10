@@ -3,6 +3,56 @@
 @section('titulo', 'Métricas de acerto da IA')
 
 @section('conteudo')
+    <h2>Acompanhamento por projeto</h2>
+    <p style="color:#666; font-size:13px;">
+        Lead time: tempo desde a primeira mudança de status até "Concluído" (ou até agora, se ainda
+        não concluiu) — inclui todo o fluxo humano. Duração da IA: tempo só das chamadas de IA em si,
+        da primeira à última chamada registrada. Chamadas de IA: total de vezes que o sistema chamou
+        o Ollama (embedding + matching) para esse projeto, e quantas dessas chamadas falharam.
+    </p>
+    <table style="margin-bottom:32px;">
+        <thead>
+        <tr>
+            <th>Projeto</th>
+            <th>Status</th>
+            <th>Lead time</th>
+            <th>Duração da IA</th>
+            <th>Evidências</th>
+            <th>Chamadas de IA</th>
+            <th>Falhas</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse ($acompanhamento as $processo)
+            <tr>
+                <td>{{ $processo->nome }}</td>
+                <td>
+                    <span class="badge badge-{{ $processo->status }}">{{ ucfirst(str_replace('_', ' ', $processo->status)) }}</span>
+                </td>
+                <td>
+                    {{ $processo->lead_time_horas !== null ? $processo->lead_time_horas.' h' : '—' }}
+                    @if (! $processo->esta_concluido)
+                        <span style="font-size:11px; color:#92400e;">(em andamento)</span>
+                    @endif
+                </td>
+                <td>
+                    {{ $processo->duracao_ia_texto ?? '—' }}
+                    @if ($processo->ia_ainda_processando)
+                        <span style="font-size:11px; color:#92400e;">(em andamento)</span>
+                    @endif
+                </td>
+                <td>{{ $processo->evidencias_count }}</td>
+                <td>{{ $processo->chamadas_ia_total }}</td>
+                <td style="{{ $processo->chamadas_ia_falhas > 0 ? 'color:#991b1b; font-weight:bold;' : '' }}">
+                    {{ $processo->chamadas_ia_falhas }}
+                </td>
+            </tr>
+        @empty
+            <tr><td colspan="7">Nenhum projeto cadastrado ainda.</td></tr>
+        @endforelse
+        </tbody>
+    </table>
+
     <h2>Métricas de acerto da IA</h2>
     <p style="color:#666; font-size:13px;">
         Baseado nas decisões que analistas/auditores já tomaram sobre as sugestões da IA
@@ -90,11 +140,11 @@
         </tbody>
     </table>
 
-    <h3 style="margin-top:32px;">Por processo</h3>
+    <h3 style="margin-top:32px;">Por projeto</h3>
     <table>
         <thead>
         <tr>
-            <th>Processo</th>
+            <th>Projeto</th>
             <th>Total</th>
             <th>Confirmadas</th>
             <th>Rejeitadas</th>

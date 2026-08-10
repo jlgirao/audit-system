@@ -9,6 +9,7 @@ class AuditQuestion extends Model
     protected $fillable = [
         'codigo',
         'texto_pergunta',
+        'contexto_adicional',
         'categoria',
         'aba_excel',
         'linha_excel',

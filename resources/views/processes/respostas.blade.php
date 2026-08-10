@@ -11,7 +11,29 @@
         preenchido automaticamente como "N/A".
     </p>
 
-    <form method="POST" action="{{ route('processes.respostas.aplicar_nao', $processo) }}" style="margin-bottom:20px;">
+    <form method="GET" style="display:flex; gap:8px; margin-bottom:16px; align-items:center;">
+        <label style="font-weight:normal; margin:0;">Filtrar por aba:</label>
+        <select name="aba" onchange="this.form.submit()">
+            <option value="">Todas as abas</option>
+            @foreach ($abasDisponiveis as $aba)
+                <option value="{{ $aba }}" @selected(request('aba') === $aba)>{{ $aba }}</option>
+            @endforeach
+        </select>
+
+        <label style="font-weight:normal; margin:0;">Filtrar por:</label>
+        <select name="filtro" onchange="this.form.submit()">
+            <option value="" @selected(!request('filtro'))>Todas as perguntas</option>
+            <option value="com_sugestao" @selected(request('filtro') === 'com_sugestao')>Com sugestão da IA</option>
+            <option value="sem_resposta" @selected(request('filtro') === 'sem_resposta')>Sem resposta ainda</option>
+        </select>
+        @if (request('per_page'))
+            <input type="hidden" name="per_page" value="{{ request('per_page') }}">
+        @endif
+    </form>
+
+    @include('partials._per_page_selector')
+
+    <form method="POST" action="{{ route('processes.respostas.aplicar_nao', $processo) }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}" style="margin-bottom:20px;">
         @csrf
         <button type="submit" style="background:#57534e;">
             Aplicar "Não" às perguntas sem evidência
@@ -19,10 +41,11 @@
         <span style="font-size:12px; color:#666; margin-left:8px;">
             Preenche automaticamente (Resposta = Não, Observações = N/A) só as perguntas que ainda não têm
             nenhuma resposta salva e nenhuma evidência confirmada — não sobrescreve nada já preenchido.
+            <strong>Aplica em todas as perguntas do projeto, não só na página atual.</strong>
         </span>
     </form>
 
-    <form method="POST" action="{{ route('processes.respostas.update', $processo) }}">
+    <form method="POST" action="{{ route('processes.respostas.update', $processo) }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}">
         @csrf
         @method('PUT')
 
@@ -37,23 +60,31 @@
                 <p style="font-weight:bold; margin:0 0 12px;">{{ $pergunta->texto_pergunta }}</p>
 
                 @if ($sugestoes->isNotEmpty())
-                    <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:10px 12px; margin-bottom:12px;">
-                        <p style="font-size:12px; font-weight:bold; margin:0 0 8px; color:#3730a3;">🤖 Sugestões da IA</p>
+                    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px 12px; margin-bottom:12px;">
+                        <p style="font-size:12px; font-weight:bold; margin:0 0 8px; color:#334155;">🤖 Sugestões da IA</p>
                         @foreach ($sugestoes as $sugestao)
-                            <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-top:1px solid #c7d2fe;">
-                                <span style="font-size:13px;">
+                            @php
+                                $corResposta = match ($sugestao->resposta_sugerida) {
+                                    'sim' => ['bg' => '#dcfce7', 'text' => '#166534', 'label' => 'Sim'],
+                                    'nao' => ['bg' => '#fee2e2', 'text' => '#991b1b', 'label' => 'Não'],
+                                    'nao_aplicavel' => ['bg' => '#e5e7eb', 'text' => '#374151', 'label' => 'Não aplicável'],
+                                    default => ['bg' => '#e5e7eb', 'text' => '#374151', 'label' => '—'],
+                                };
+                            @endphp
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; margin-top:4px; border-radius:4px; background:{{ $corResposta['bg'] }};">
+                                <span style="font-size:13px; color:#1f2937;">
                                     {{ $sugestao->evidencia->nome_arquivo }}
                                     — <strong>{{ round($sugestao->score_confianca) }}% confiança</strong>
-                                    — resposta sugerida: {{ ['sim' => 'Sim', 'nao' => 'Não', 'nao_aplicavel' => 'Não aplicável'][$sugestao->resposta_sugerida] ?? '—' }}
+                                    — resposta sugerida: <strong style="color:{{ $corResposta['text'] }};">{{ $corResposta['label'] }}</strong>
                                 </span>
                                 <button type="button"
-                                    onclick="usarSugestaoIA({{ $pergunta->id }}, {{ $sugestao->evidence_file_id }}, '{{ $sugestao->resposta_sugerida }}', {{ json_encode($sugestao->parecer_sugerido) }})"
-                                    style="margin-top:0; padding:4px 10px; font-size:12px;">
+                                    onclick="usarSugestaoIA({{ $pergunta->id }}, {{ $sugestao->evidence_file_id }}, {{ json_encode($sugestao->evidencia->nome_arquivo) }}, '{{ $sugestao->resposta_sugerida }}', {{ json_encode($sugestao->parecer_sugerido) }})"
+                                    style="margin-top:0; padding:4px 10px; font-size:12px; background:#1f2937;">
                                     Usar esta sugestão
                                 </button>
                             </div>
                             @if ($sugestao->parecer_sugerido)
-                                <p style="font-size:12px; color:#4338ca; margin:2px 0 0; font-style:italic;">"{{ $sugestao->parecer_sugerido }}"</p>
+                                <p style="font-size:12px; color:{{ $corResposta['text'] }}; margin:2px 0 8px; font-style:italic;">"{{ $sugestao->parecer_sugerido }}"</p>
                             @endif
                         @endforeach
                     </div>
@@ -96,6 +127,8 @@
         <button type="submit">Salvar respostas</button>
     </form>
 
+    <div style="margin-top:16px;">{{ $perguntas->links('partials._pagination') }}</div>
+
     <script>
         function alternarObservacoesObrigatorias(select, perguntaId) {
             const label = document.getElementById('label-observacoes-' + perguntaId);
@@ -103,7 +136,7 @@
             label.innerHTML = 'Observações' + (select.value === 'nao' ? marcaAviso : '');
         }
 
-        function usarSugestaoIA(perguntaId, evidenciaId, respostaSugerida, parecerSugerido) {
+        function usarSugestaoIA(perguntaId, evidenciaId, evidenciaNome, respostaSugerida, parecerSugerido) {
             const selectResposta = document.getElementById('select-resposta-' + perguntaId);
             selectResposta.value = respostaSugerida;
             alternarObservacoesObrigatorias(selectResposta, perguntaId);
@@ -116,7 +149,18 @@
             }
 
             if (parecerSugerido) {
-                document.getElementById('textarea-parecer-' + perguntaId).value = parecerSugerido;
+                const textarea = document.getElementById('textarea-parecer-' + perguntaId);
+                const trechoNovo = evidenciaNome ? (evidenciaNome + ': ' + parecerSugerido) : parecerSugerido;
+
+                // Acumula em vez de substituir — assim, aceitar mais de uma
+                // sugestão para a mesma pergunta junta os pareceres, em vez
+                // de o último clique apagar o anterior. Evita duplicar se
+                // clicar duas vezes na mesma sugestão.
+                if (! textarea.value.includes(parecerSugerido)) {
+                    textarea.value = textarea.value.trim()
+                        ? textarea.value.trim() + '\n\n' + trechoNovo
+                        : trechoNovo;
+                }
             }
         }
     </script>

@@ -5,8 +5,8 @@
 @section('conteudo')
     <h2>Configuração da IA (Ollama)</h2>
     <p style="color:#666; font-size:13px;">
-        Ajustes aqui valem para o matching automático de todos os processos.
-        Depois de salvar, use o botão "Rodar matching por IA" na tela de um processo
+        Ajustes aqui valem para o matching automático de todos os projetos.
+        Depois de salvar, use o botão "Rodar matching por IA" na tela de um projeto
         para reprocessar com a nova configuração.
     </p>
 
@@ -32,9 +32,25 @@
             (mais lento). Muito alto = pode deixar de sugerir evidências relevantes.
         </p>
 
-        <label>Máximo de perguntas candidatas por evidência</label>
-        <input type="number" min="1" max="10" name="max_candidatos_por_evidencia"
+        <label>Máximo de perguntas candidatas por ABA (por evidência)</label>
+        <input type="number" min="1" max="10" name="max_candidatos_por_aba"
+            value="{{ old('max_candidatos_por_aba', $valores['max_candidatos_por_aba']) }}" required>
+        <p style="font-size:12px; color:#666; margin-top:2px;">
+            As perguntas candidatas (acima do limiar) são agrupadas por "Aba no Excel" antes de
+            ir para o LLM — isso evita que uma aba com perguntas mais genéricas (que tendem a ter
+            similaridade moderada com qualquer documento) ocupe todas as vagas e deixe perguntas
+            de outras abas de fora, mesmo com similaridade real e válida.
+        </p>
+
+        <label>Teto de segurança: máximo TOTAL de chamadas de LLM por evidência</label>
+        <input type="number" min="1" max="100" name="max_candidatos_por_evidencia"
             value="{{ old('max_candidatos_por_evidencia', $valores['max_candidatos_por_evidencia']) }}" required>
+        <p style="font-size:12px; color:#666; margin-top:2px;">
+            Limite geral, somando todas as abas — protege contra um número excessivo de chamadas
+            se houver muitas abas cadastradas (ex: 10 abas × 2 por aba = 20 chamadas nesse
+            exemplo). Ajuste para cima se tiver muitas abas e quiser garantir que todas
+            realmente cheguem a competir.
+        </p>
 
         <label>Limite de caracteres enviados para gerar o embedding</label>
         <input type="number" min="200" max="20000" name="limite_caracteres_embedding"

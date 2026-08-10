@@ -8,13 +8,28 @@
         <a class="btn" href="{{ route('questions.create') }}">+ Nova pergunta</a>
     </div>
 
+    <form method="GET" style="display:flex; gap:8px; margin-bottom:16px;">
+        <input type="text" name="busca" placeholder="Buscar por código ou texto" value="{{ request('busca') }}" style="flex:1;">
+        <select name="aba">
+            <option value="">Todas as abas</option>
+            @foreach ($abasDisponiveis as $aba)
+                <option value="{{ $aba }}" @selected(request('aba') === $aba)>{{ $aba }}</option>
+            @endforeach
+        </select>
+        <button type="submit">Filtrar</button>
+        <a href="{{ route('questions.exportar') }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}"
+            title="Exportar para Excel" style="display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; background:#166534; color:#fff; border-radius:4px; text-decoration:none; font-size:16px; margin-top:0;">⬇</a>
+    </form>
+
+    @include('partials._per_page_selector')
+
     <table>
         <thead>
         <tr>
-            <th>Código</th>
-            <th>Pergunta</th>
-            <th>Aba</th>
-            <th>Linha</th>
+            @include('partials._sort_header', ['coluna' => 'codigo', 'label' => 'Código'])
+            @include('partials._sort_header', ['coluna' => 'texto_pergunta', 'label' => 'Pergunta'])
+            @include('partials._sort_header', ['coluna' => 'aba_excel', 'label' => 'Aba'])
+            @include('partials._sort_header', ['coluna' => 'linha_excel', 'label' => 'Linha'])
             <th>Col. Resposta</th>
             <th>Col. Observações</th>
             <th>Col. Arq. Evidência</th>
@@ -53,5 +68,5 @@
         </tbody>
     </table>
 
-    <div style="margin-top:16px;">{{ $perguntas->links() }}</div>
+    <div style="margin-top:16px;">{{ $perguntas->links('partials._pagination') }}</div>
 @endsection
