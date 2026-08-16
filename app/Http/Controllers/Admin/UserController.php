@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ExcelExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -19,11 +20,69 @@ class UserController extends Controller implements HasMiddleware
         ];
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $usuarios = User::with('roles')->orderBy('nome')->paginate(20);
+        $perPage = in_array((int) $request->input('per_page'), [10, 20, 50, 100], true)
+            ? (int) $request->input('per_page')
+            : 20;
 
-        return view('admin.users.index', compact('usuarios'));
+        $usuarios = $this->queryFiltrada($request)->with('roles')->paginate($perPage)->withQueryString();
+        $rolesDisponiveis = Role::orderBy('name')->get();
+
+        return view('admin.users.index', compact('usuarios', 'rolesDisponiveis'));
+    }
+
+    /**
+     * Exporta para Excel exatamente o resultado do filtro/busca/ordenação
+     * ativos na tela.
+     */
+    public function exportar(Request $request)
+    {
+        $usuarios = $this->queryFiltrada($request)->with('roles')->get();
+
+        $cabecalhos = ['Nome', 'E-mail', 'Perfis', 'Ativo'];
+
+        $linhas = $usuarios->map(fn (User $usuario) => [
+            $usuario->nome,
+            $usuario->email,
+            $usuario->roles->pluck('name')->map(fn ($r) => ucfirst($r))->join(', '),
+            $usuario->ativo ? 'Sim' : 'Não',
+        ]);
+
+        return ExcelExporter::gerar($cabecalhos, $linhas, 'usuarios.xlsx');
+    }
+
+    /**
+     * Monta a query com busca (nome/e-mail), filtro por perfil, filtro por
+     * ativo/inativo e ordenação — usada tanto pela listagem quanto pela
+     * exportação.
+     */
+    private function queryFiltrada(Request $request)
+    {
+        $query = User::query();
+
+        if ($busca = $request->input('busca')) {
+            $query->where(function ($q) use ($busca) {
+                $q->where('nome', 'like', "%{$busca}%")
+                    ->orWhere('email', 'like', "%{$busca}%");
+            });
+        }
+
+        if ($perfil = $request->input('perfil')) {
+            $query->whereHas('roles', fn ($q) => $q->where('name', $perfil));
+        }
+
+        if ($request->input('status') === 'ativo') {
+            $query->where('ativo', true);
+        } elseif ($request->input('status') === 'inativo') {
+            $query->where('ativo', false);
+        }
+
+        $colunasOrdenaveis = ['nome', 'email', 'ativo'];
+        $sort = in_array($request->input('sort'), $colunasOrdenaveis, true) ? $request->input('sort') : 'nome';
+        $direction = $request->input('direction') === 'desc' ? 'desc' : 'asc';
+
+        return $query->orderBy($sort, $direction);
     }
 
     public function create()

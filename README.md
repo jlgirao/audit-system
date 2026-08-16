@@ -1,123 +1,100 @@
-# Ajustes — Pontos 1 a 6
+# Troca de texto: "Processo" → "Projeto" (só texto visível)
 
-Este pacote contém os arquivos **novos ou alterados** para atender aos 6
-pontos que você levantou. Ele parte da estrutura que você já ajustou para
-Laravel 11 / PHP 8.4 (padrão `HasMiddleware`, `bootstrap/app.php` sem
-`Kernel.php`), então mantive o mesmo estilo.
+Baseado nos arquivos **reais** que você enviou (`sistema-auditoria.zip`),
+não numa reconstrução de memória — por isso esse pacote pode ser
+aplicado com confiança.
 
-## Como aplicar
-
-### 1. Copiar os arquivos por cima do projeto
+## Arquivos alterados (12 no total)
 
 ```
-app/Models/User.php                          → substitui
-app/Models/AuditProcess.php                   → substitui
-app/Http/Controllers/AccountController.php    → NOVO
-app/Http/Controllers/AuditProcessController.php → substitui
-app/Http/Controllers/UserController.php       → substitui (fica em app/Http/Controllers/Admin/)
-app/Http/Middleware/ForcarTrocaSenha.php       → NOVO
-bootstrap/app.php                              → substitui
-routes/web.php                                 → substitui
-database/migrations/*.php                      → adiciona (2 arquivos novos)
-database/seeders/RolesAndPermissionsSeeder.php → substitui
-database/seeders/AdminUserSeeder.php           → substitui
-resources/views/layouts/app.blade.php          → substitui
-resources/views/account/editar.blade.php       → NOVO
-resources/views/processes/*.blade.php          → substitui (index, create, show) + NOVO (edit)
-resources/views/admin/users/edit.blade.php     → substitui
+app/Http/Controllers/AuditProcessController.php
+resources/views/layouts/app.blade.php
+resources/views/admin/dropbox/index.blade.php
+resources/views/admin/ia/index.blade.php
+resources/views/metricas/index.blade.php
+resources/views/processes/create.blade.php
+resources/views/processes/index.blade.php
+resources/views/processes/edit.blade.php
+resources/views/processes/excluidos.blade.php
+resources/views/processes/show.blade.php
+resources/views/processes/respostas.blade.php
+resources/views/processes/_dropbox_picker.blade.php
 ```
 
-Atenção ao `UserController.php`: neste pacote ele está na raiz por
-simplicidade de envio, mas o namespace do arquivo é `App\Http\Controllers\Admin`
-— ele deve ir para `app/Http/Controllers/Admin/UserController.php`, como já
-estava no seu projeto.
+Sem migration, sem rota nova.
 
-### 2. Rodar as migrations novas
+## O que foi mantido de propósito (não mudou)
 
-```bash
-php artisan migrate
-```
+- **Rotas**: `processes.index`, `processes.show`, etc. — continuam
+  `/processos/...` na URL.
+- **Nomes de permissão**: `criar-processo`, `excluir-processo`,
+  `ver-todos-processos` — continuam iguais no banco/`@can()`.
+- **Nomes de variável**: `$processo`, `$process`, `$porProcesso` — só
+  identificadores internos do código, não aparecem para o usuário.
+- **Nome de coluna**: `papel_no_processo` (tabela `process_assignments`)
+  — é estrutura de banco, mudar isso seria uma migration, não um texto.
+- **Comentários internos do código** (`// ...`, `/** ... */`) — não são
+  vistos pelo usuário, deixei como estavam para não aumentar o risco à
+  toa.
 
-Isso adiciona a coluna `deve_alterar_senha` em `users` e `descricao` em
-`audit_processes`, sem alterar nada que já existia.
+## O que mudou (lista completa)
 
-### 3. Rodar o seeder de permissões novamente
+**Menu e telas gerais**
+- Link "Processos" no menu → "Projetos"
+- "Processos de auditoria" (título e cabeçalho) → "Projetos de auditoria"
+- "+ Novo processo" → "+ Novo projeto"
+- "Nenhum processo encontrado." → "Nenhum projeto encontrado."
+- "todos os processos" / "somente os meus processos" → "...projetos"
 
-```bash
-php artisan db:seed --class=Database\\Seeders\\RolesAndPermissionsSeeder
-```
+**Criar/editar**
+- "Novo processo" / "Editar processo" → "Novo projeto" / "Editar projeto"
+- "Nome do processo" → "Nome do projeto"
+- "Criar processo" → "Criar projeto"
+- Placeholder de exemplo `/Auditorias/Processo_2026_001` →
+  `/Auditorias/Projeto_2026_001`
 
-Isso cria a nova permissão `concluir-processo` e reatribui as permissões
-de cada perfil (usa `firstOrCreate`/`syncPermissions`, então é seguro rodar
-de novo sem duplicar nada nem apagar usuários existentes).
+**Excluir/restaurar**
+- "Excluir processo" (botão e confirmação) → "Excluir projeto"
+- "Processos excluídos" (título, texto explicativo) → "Projetos excluídos"
+- "Restaurar este processo?" → "Restaurar este projeto?"
+- "Nenhum processo excluído." → "Nenhum projeto excluído."
 
-### 4. Usuários já existentes
+**Tela do processo**
+- "Este processo tem tarefas em segundo plano..." → "Este projeto tem..."
+- "outros processos na frente" → "outros projetos na frente"
+- "Você não tem permissão para alterar o status deste processo." →
+  "...deste projeto."
 
-Se você já tinha usuários cadastrados antes deste ajuste, o admin
-provavelmente não está com `deve_alterar_senha = true` retroativamente —
-isso é esperado (a coluna nasce com `false` por padrão). Se quiser forçar a
-troca de senha de alguém já existente, basta abrir a edição do usuário e
-marcar "Forçar troca de senha no próximo login".
+**Métricas**
+- "Acompanhamento por processo" → "Acompanhamento por projeto"
+- "Por processo" (segunda tabela) → "Por projeto"
+- Cabeçalho de coluna "Processo" (2x) → "Projeto"
+- "Nenhum processo cadastrado ainda." → "Nenhum projeto cadastrado ainda."
 
-## O que foi implementado, ponto a ponto
+**Dropbox**
+- Aviso de desconexão: "...todos os processos vai parar" → "...todos os
+  projetos vai parar"
 
-**1. Usuário altera a própria senha**
-Tela nova em `/minha-conta` (`AccountController::editar` /
-`atualizarSenha`), exige a senha atual antes de trocar. Link adicionado no
-cabeçalho (nome do usuário agora é clicável).
+**Painel de IA (`/admin/ia`)**
+- Texto explicativo mencionando "processos"/"processo" → "projetos"/"projeto"
 
-**2. Admin altera senha de outros e/ou força troca no próximo login**
-No formulário de edição de usuário (`admin/users/edit.blade.php`), dois
-campos novos e independentes:
-- "Nova senha" (opcional) — se preenchido, já troca a senha.
-- "Forçar troca de senha no próximo login" — marca a flag
-  `deve_alterar_senha`, mesmo sem definir uma nova senha agora.
+**Respostas**
+- "Aplica em todas as perguntas do processo" → "...do projeto"
 
-Um middleware global (`ForcarTrocaSenha`, registrado em
-`bootstrap/app.php`) intercepta **qualquer** requisição de um usuário
-autenticado com essa flag ativa e redireciona para `/trocar-senha` — uma
-tela dedicada que não pede senha atual (o usuário pode não saber a senha
-temporária que o admin definiu, do ponto de vista de já estar logado via
-sessão). Usuários novos (`UserController::store`) já nascem com essa flag
-ativa.
+**Mensagens do controller (as que aparecem na tela após uma ação)**
+- "Processo criado com sucesso." → "Projeto criado com sucesso."
+- "Processo atualizado com sucesso." → "Projeto atualizado com sucesso."
+- "Processo excluído com sucesso." → "Projeto excluído com sucesso."
+- "Processo restaurado com sucesso." → "Projeto restaurado com sucesso."
+- Comentário do histórico de status "Processo criado." → "Projeto criado."
+- Nome do arquivo exportado: `processos.xlsx` → `projetos.xlsx`
 
-**3. Admin vê todos os processos**
-A permissão `ver-todos-processos` (que o admin já tinha por ter todas as
-permissões) agora faz a listagem mostrar todos os processos **por
-padrão**, sem precisar de parâmetro na URL — antes era o contrário
-(precisava passar `?todos=1`). Quem tem essa permissão pode alternar para
-"ver só os meus" com um link na tela.
+## Teste
 
-**4. Descrição e responsáveis editáveis**
-Novo campo `descricao` no processo (migration + model + telas de criar e
-editar). Nova rota/tela `/processos/{id}/editar` que permite reatribuir
-completamente a lista de responsáveis. Autorização em
-`AuditProcess::podeSerEditadoPor()`: admin sempre pode; qualquer outro
-usuário só pode editar processos onde ele é um dos responsáveis
-atribuídos ("o seu").
-
-**5 e 6. Transições de status controladas por permissão**
-Centralizei a regra em `AuditProcess::statusDisponiveisPara()` e
-`AuditProcess::PERMISSAO_POR_STATUS`:
-- `devolvido` exige `revisar-processo`
-- `aprovado` exige `aprovar-processo`
-- `concluido` exige `concluir-processo` (permissão nova)
-- `reaberto` exige `reabrir-processo`
-- `em_analise`/`em_revisao` ficam livres para qualquer responsável
-  atribuído ao processo (ou admin)
-
-Como o perfil `analista` não tem `aprovar-processo` nem
-`concluir-processo` (ver seeder), essas opções **não aparecem** no
-`<select>` da tela para ele (ponto 6 — "não deve nem ficar disponível") —
-e mesmo que alguém tentasse forçar via requisição direta, o controller
-revalida a mesma lista de permissões no servidor antes de aplicar a
-transição. Como o admin tem todas as permissões, ele sempre vê e pode
-usar qualquer status (ponto 5).
-
-## Ponto em aberto para vocês decidirem
-
-Ficou definido que **auditor** pode aprovar e concluir. Não ficou claro
-se ele também deveria poder **devolver para reabertura** sem ser admin —
-deixei do jeito que já estava (auditor tem `reabrir-processo`), mas é só
-uma linha no seeder para mudar se vocês quiserem restringir isso só ao
-admin.
+1. Percorra as telas principais (`/processos`, criar, editar, excluir,
+   restaurar, `/metricas`, `/admin/dropbox`, `/admin/ia`) e confirme
+   visualmente que tudo mudou para "Projeto"/"Projetos".
+2. Confirme que **os links continuam funcionando** normalmente (as
+   URLs `/processos/...` não mudaram, só o texto visível).
+3. Exporte a listagem em Excel e confirme que o arquivo baixado se
+   chama `projetos.xlsx`.

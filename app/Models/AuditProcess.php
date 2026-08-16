@@ -32,6 +32,7 @@ class AuditProcess extends Model
         'dropbox_folder_path',
         'dropbox_cursor',
         'tem_arquivos_novos',
+        'status_sincronizacao',
         'criado_por',
     ];
 
@@ -80,6 +81,11 @@ class AuditProcess extends Model
     public function arquivosSaida()
     {
         return $this->hasMany(OutputFile::class, 'process_id')->orderByDesc('versao');
+    }
+
+    public function chamadasIa()
+    {
+        return $this->hasMany(AiCallLog::class, 'process_id');
     }
 
     /**

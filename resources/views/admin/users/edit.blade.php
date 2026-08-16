@@ -44,6 +44,9 @@
             Forçar troca de senha no próximo login
         </label>
 
-        <button type="submit">Salvar alterações</button>
+        <div style="display:flex; gap:8px;">
+            <button type="submit">Salvar alterações</button>
+            <a href="{{ route('admin.users.index') }}" class="btn" style="background:#57534e;">Cancelar</a>
+        </div>
     </form>
 @endsection

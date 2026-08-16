@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f4; color: #222; }
-        header { background: #1f2937; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+        header { background: #1f2937; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
         header a { color: #fff; text-decoration: none; margin-right: 16px; }
         main { padding: 24px; max-width: 1100px; margin: 0 auto; }
         table { width: 100%; border-collapse: collapse; background: #fff; }
@@ -24,17 +24,37 @@
         form label { display: block; margin-top: 12px; font-weight: bold; font-size: 13px; }
         form input, form select, form textarea { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
         button, .btn { background: #1f2937; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 12px; }
+
+        /* Grupo de botões de ação em tabelas (editar/duplicar/remover, etc.) */
+        .acoes { display: flex; gap: 6px; flex-wrap: nowrap; }
+        .acao-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: 4px; font-size: 15px; line-height: 1; text-decoration: none; color: #fff; border: none; cursor: pointer; margin-top: 0; }
+        .acao-editar { background: #1f2937; }
+        .acao-editar:hover { background: #111827; }
+        .acao-duplicar { background: #57534e; }
+        .acao-duplicar:hover { background: #44403c; }
+        .acao-remover { background: #991b1b; }
+        .acao-remover:hover { background: #7f1d1d; }
     </style>
 </head>
 <body>
 <header>
     <div>
-        <a href="{{ route('processes.index') }}">Processos</a>
+        <a href="{{ route('processes.index') }}">Projetos</a>
         @can('gerenciar-perguntas')
             <a href="{{ route('questions.index') }}">Perguntas</a>
+            <a href="{{ route('admin.template.index') }}">Template Excel</a>
         @endcan
         @can('gerenciar-usuarios')
             <a href="{{ route('admin.users.index') }}">Usuários</a>
+        @endcan
+        @can('configurar-dropbox')
+            <a href="{{ route('admin.dropbox.index') }}">Dropbox</a>
+        @endcan
+        @can('configurar-ia')
+            <a href="{{ route('admin.ia.index') }}">IA</a>
+        @endcan
+        @can('ver-metricas-ia')
+            <a href="{{ route('metricas.index') }}">Métricas</a>
         @endcan
     </div>
     <div>

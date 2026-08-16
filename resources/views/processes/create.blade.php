@@ -1,21 +1,20 @@
 @extends('layouts.app')
 
-@section('titulo', 'Novo processo')
+@section('titulo', 'Novo projeto')
 
 @section('conteudo')
-    <h2>Novo processo de auditoria</h2>
+    <h2>Novo projeto de auditoria</h2>
 
     <form method="POST" action="{{ route('processes.store') }}">
         @csrf
 
-        <label>Nome do processo</label>
+        <label>Nome do projeto</label>
         <input type="text" name="nome" value="{{ old('nome') }}" required>
 
         <label>Descrição</label>
         <textarea name="descricao" rows="3">{{ old('descricao') }}</textarea>
 
-        <label>Caminho da pasta no Dropbox</label>
-        <input type="text" name="dropbox_folder_path" placeholder="/Auditorias/Processo_2026_001" value="{{ old('dropbox_folder_path') }}" required>
+        @include('processes._dropbox_picker', ['valorAtual' => ''])
 
         <label>Responsáveis (selecione um ou mais)</label>
         <select name="responsaveis[]" multiple size="6" required>
@@ -31,6 +30,9 @@
             @endforeach
         </select>
 
-        <button type="submit">Criar processo</button>
+        <div style="display:flex; gap:8px;">
+            <button type="submit">Criar projeto</button>
+            <a href="{{ route('processes.index') }}" class="btn" style="background:#57534e;">Cancelar</a>
+        </div>
     </form>
 @endsection

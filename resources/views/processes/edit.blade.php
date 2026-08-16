@@ -1,22 +1,21 @@
 @extends('layouts.app')
 
-@section('titulo', 'Editar processo')
+@section('titulo', 'Editar projeto')
 
 @section('conteudo')
-    <h2>Editar processo</h2>
+    <h2>Editar projeto</h2>
 
     <form method="POST" action="{{ route('processes.update', $processo) }}">
         @csrf
         @method('PUT')
 
-        <label>Nome do processo</label>
+        <label>Nome do projeto</label>
         <input type="text" name="nome" value="{{ old('nome', $processo->nome) }}" required>
 
         <label>Descrição</label>
         <textarea name="descricao" rows="3">{{ old('descricao', $processo->descricao) }}</textarea>
 
-        <label>Caminho da pasta no Dropbox</label>
-        <input type="text" name="dropbox_folder_path" value="{{ old('dropbox_folder_path', $processo->dropbox_folder_path) }}" required>
+        @include('processes._dropbox_picker', ['valorAtual' => $processo->dropbox_folder_path])
 
         <label>Responsáveis (selecione um ou mais)</label>
         <select name="responsaveis[]" multiple size="6" required>
@@ -39,6 +38,9 @@
             @endforeach
         </select>
 
-        <button type="submit">Salvar alterações</button>
+        <div style="display:flex; gap:8px;">
+            <button type="submit">Salvar alterações</button>
+            <a href="{{ route('processes.show', $processo) }}" class="btn" style="background:#57534e;">Cancelar</a>
+        </div>
     </form>
 @endsection
