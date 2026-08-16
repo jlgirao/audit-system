@@ -19,23 +19,43 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
 
           script: |
+            set -e
+
+            echo "======================================"
+            echo " Iniciando deploy do Audit System"
+            echo "======================================"
+
             cd /home/fix-srv/public_html/audit-system
 
-            echo "Iniciando deploy..."
+            echo "Configurando diretório seguro do Git..."
+            git config --global --add safe.directory /home/fix-srv/public_html/audit-system
 
+            echo "Atualizando código..."
             git pull origin main
 
-            composer install --no-dev --optimize-autoloader
+            echo "Instalando dependências..."
+            composer install --no-dev --optimize-autoloader --no-interaction
 
+            echo "Executando migrations..."
             php artisan migrate --force
 
+            echo "Limpando caches..."
             php artisan config:clear
             php artisan cache:clear
             php artisan route:clear
             php artisan view:clear
 
+            echo "Recriando caches..."
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
 
-            echo "Deploy concluído!"
+            echo "Otimizando aplicação..."
+            php artisan optimize
+
+            echo "Reiniciando filas..."
+            php artisan queue:restart || true
+
+            echo "======================================"
+            echo " Deploy concluído com sucesso"
+            echo "======================================"
