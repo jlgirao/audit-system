@@ -1,4 +1,4 @@
-# Troca de texto: "Processo" → "Projeto" (só texto visível)
+# Troca de texto: "Processo" → "Projeto" (só texto visível).
 
 Baseado nos arquivos **reais** que você enviou (`sistema-auditoria.zip`),
 não numa reconstrução de memória — por isso esse pacote pode ser
