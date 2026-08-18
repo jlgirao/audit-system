@@ -17,6 +17,10 @@ Homestead.json
 Homestead.yaml
 npm-debug.log
 yarn-error.log
+README.md
+REAME_guia-deploy-almalinux.md
+README_guia-deploy-producao_ubuntu.md
+README_guia-deploy-producao_almaLinux.md
 /auth.json
 /.fleet
 /.idea
