@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -17,6 +18,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+
+        // Necessário para rodar atrás de um proxy reverso (Nginx Proxy
+        // Manager) — sem isso, o Laravel não sabe que a conexão original
+        // do visitante é HTTPS, e gera links/formulários como "http://"
+        // mesmo com o certificado certo por fora. "at: '*'" é seguro aqui
+        // porque os containers não são acessíveis diretamente de fora, só
+        // através do proxy.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO
+        );
 
         $middleware->alias([
             'role' => RoleMiddleware::class,
